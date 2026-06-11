@@ -1,8 +1,17 @@
+import { useEffect } from 'react';
+
 import { ChatWidget } from '../components/ChatWidget';
 import { GlobeCanvas } from '../components/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
+import { fetchStaticVesselInfo } from '../api/vessels';
 
 export function LandingPage() {
+  useEffect(() => {
+    fetchStaticVesselInfo()
+      .then((vessels) => console.log('static_vessel_info:', vessels))
+      .catch((error) => console.error('Failed to load static_vessel_info:', error));
+  }, []);
+
   return (
     <main
       style={{

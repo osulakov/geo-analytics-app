@@ -28,3 +28,10 @@ function hashMmsi(mmsi: string): number {
 export function colorForMmsi(mmsi: string): string {
   return PING_PALETTE[hashMmsi(mmsi) % PING_PALETTE.length];
 }
+
+/** Same color as colorForMmsi but with an alpha channel (for glow/pulse rings). */
+export function colorForMmsiAlpha(mmsi: string, alpha: number): string {
+  return colorForMmsi(mmsi)
+    .replace('hsl(', 'hsla(')
+    .replace(')', `, ${alpha})`);
+}

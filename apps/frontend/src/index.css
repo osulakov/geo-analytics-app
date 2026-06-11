@@ -118,14 +118,282 @@ body {
   background: var(--accent-soft);
 }
 
-.chat-widget {
+.left-stack {
   position: fixed;
   top: 20px;
   left: 20px;
   z-index: 20;
   width: 25vw;
   min-width: 280px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 2px 4px 6px;
+}
+
+.brand__logo {
+  filter: drop-shadow(0 0 10px rgba(29, 192, 156, 0.55));
+}
+
+.brand__logo svg {
+  display: block;
+  width: 176px;
+  height: auto;
+}
+
+.brand__motto {
+  margin: 20px 0;
+  color: var(--color-primary);
+  font-size: 9.36px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 8px rgba(29, 192, 156, 0.75), 0 0 16px rgba(29, 192, 156, 0.4);
+}
+
+.date-range {
+  position: relative;
+}
+
+.date-range__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--surface-panel);
+  border: none;
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--blur-panel);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.date-range__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.date-range__chevron {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.date-range__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.date-range__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(20, 24, 31, 0.45);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+}
+
+.date-range__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-fg);
+}
+
+.date-range__field > span {
+  opacity: 0.6;
+}
+
+.date-range__field input {
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  color-scheme: dark;
+}
+
+.date-range__apply {
+  margin-top: 2px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.date-range__apply:hover {
+  background: var(--accent-hover);
+}
+
+.vessels-widget {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-panel);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--blur-panel);
+  overflow: hidden;
+}
+
+.vessels-widget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 11px 14px 8px;
+  background: none;
+  border: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vessels-widget__chevron {
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.vessels-widget:not(.is-collapsed) .vessels-widget__chevron {
+  transform: rotate(180deg);
+}
+
+.vessels-widget__search {
+  padding: 0 12px 12px;
+}
+
+.vessels-widget__search input {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.vessels-widget__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.vessel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.vessel-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vessel-row__color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.vessel-row__info {
+  min-width: 0;
+}
+
+.vessel-row__name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vessel-row__meta {
+  font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vessels-widget__empty {
+  padding: 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.vessels-widget__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 4px;
+  font-size: 12px;
+}
+
+.vessels-widget__count {
+  opacity: 0.5;
+}
+
+.vessels-widget__pager button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vessels-widget__pager button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.chat-widget {
+  width: 100%;
   height: 70vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface-panel);
@@ -240,15 +508,151 @@ body {
   cursor: default;
 }
 
+.ship-counter {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface-panel);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--blur-panel);
+  color: var(--color-fg);
+  font-size: 13px;
+}
+
+.ship-counter__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.ship-counter__label {
+  opacity: 0.7;
+}
+
+.vessel-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vessel-modal {
+  position: relative;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 18px 20px;
+  /* Same translucent + blurred background as the tooltip. */
+  background: rgba(20, 24, 31, 0.4);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(6px);
+  color: var(--color-fg);
+  font-size: 13px;
+}
+
+.vessel-modal__x {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.vessel-modal__x:hover {
+  opacity: 1;
+}
+
+.vessel-modal__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+  padding-right: 20px;
+}
+
+.vessel-modal__list {
+  margin: 0 0 16px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.vessel-modal__list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vessel-modal__list dt {
+  opacity: 0.55;
+}
+
+.vessel-modal__list dd {
+  margin: 0;
+  text-align: right;
+}
+
+.vessel-modal__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vessel-modal__path,
+.vessel-modal__group {
+  flex: 1;
+  padding: 5.85px 7.8px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 10.56px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-fg);
+  transition: background var(--transition);
+}
+
+.vessel-modal__path {
+  background: var(--accent);
+}
+
+.vessel-modal__path:hover {
+  background: var(--accent-hover);
+}
+
+.vessel-modal__group {
+  background: var(--surface-control);
+}
+
+.vessel-modal__group:hover {
+  background: var(--surface-control-hover);
+}
+
 .vessel-tooltip {
   position: fixed;
   z-index: 30;
   pointer-events: none;
   min-width: 210px;
   padding: 15px 17px;
-  background: var(--surface-panel);
+  background: rgba(20, 24, 31, 0.4);
   border-radius: var(--radius-lg);
-  backdrop-filter: var(--blur-panel);
+  backdrop-filter: blur(6px);
   font-size: 12px;
   color: var(--color-fg);
 }

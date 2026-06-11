@@ -51,7 +51,8 @@ export function vesselsApiPlugin(): Plugin {
           return;
         }
 
-        const { pathname } = new URL(req.url ?? '/', 'http://localhost');
+        const url = new URL(req.url ?? '/', 'http://localhost');
+        const { pathname } = url;
         const json = (status: number, body: unknown) => {
           res.statusCode = status;
           res.setHeader('Content-Type', 'application/json');
@@ -82,6 +83,21 @@ export function vesselsApiPlugin(): Plugin {
           }
 
           if (pathname === '/pings/latest') {
+            // Optional date-range filter (?from=ISO&to=ISO).
+            const conditions: string[] = [];
+            const values: string[] = [];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
+            const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
             const { rows } = await getPool().query(
               `SELECT DISTINCT ON (mmsi)
                       mmsi,
@@ -90,12 +106,38 @@ export function vesselsApiPlugin(): Plugin {
                       ST_Y(position::geometry) AS lat,
                       heading
                  FROM ais_pings
+                 ${where}
                 ORDER BY mmsi, ts DESC`,
+              values,
             );
             json(
               200,
               rows.map((row) => ({
                 mmsi: row.mmsi,
+                ts: row.ts,
+                lon: Number(row.lon),
+                lat: Number(row.lat),
+                heading: num(row.heading),
+              })),
+            );
+            return;
+          }
+
+          const trackMatch = pathname.match(/^\/pings\/track\/(\d{1,9})$/);
+          if (trackMatch) {
+            const { rows } = await getPool().query(
+              `SELECT ts,
+                      ST_X(position::geometry) AS lon,
+                      ST_Y(position::geometry) AS lat,
+                      heading
+                 FROM ais_pings
+                WHERE mmsi = $1
+                ORDER BY ts`,
+              [trackMatch[1]],
+            );
+            json(
+              200,
+              rows.map((row) => ({
                 ts: row.ts,
                 lon: Number(row.lon),
                 lat: Number(row.lat),

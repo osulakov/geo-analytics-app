@@ -6,7 +6,7 @@ import type { GeometryCollection, Topology } from 'topojson-specification';
 
 import countries110m from 'world-atlas/countries-110m.json';
 import { useStores } from '../stores/StoreContext';
-import { colorForMmsi } from '../utils/colorMap';
+import { colorForMmsi, colorForMmsiAlpha } from '../utils/colorMap';
 
 // Pre-compute the geometry once at module load — it never changes.
 const topology = countries110m as unknown as Topology;
@@ -26,6 +26,7 @@ const COLORS = {
   markerOutline: 'rgba(0, 0, 0, 0.45)',
   atmosphere: '120, 170, 255',
   pingHoverRing: '#ffffff',
+  track: 'rgba(255, 255, 255, 0.85)',
 } as const;
 
 // Drag degrees-per-pixel at zoom = 1 (scaled down as you zoom in).
@@ -43,11 +44,15 @@ export interface PingHover {
   mmsi: string;
   x: number;
   y: number;
+  ts: string;
+  heading: number | null;
 }
 
 interface GlobeCanvasProps {
   /** Called when the hovered ping changes (null when nothing is hovered). */
   onHover?: (hover: PingHover | null) => void;
+  /** Called when a ping is clicked (vessel MMSI). */
+  onSelect?: (mmsi: string) => void;
 }
 
 // Point data to overlay on the globe. Any GeoJSON point features work here;
@@ -60,14 +65,16 @@ const markers: Feature<Point>[] = [
   },
 ];
 
-export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
+export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
   const stores = useStores();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Keep the latest onHover callback reachable from the (run-once) effect.
+  // Keep the latest callbacks reachable from the (run-once) effect.
   const onHoverRef = useRef(onHover);
   onHoverRef.current = onHover;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -86,9 +93,12 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
     let height = 0;
     let baseRadius = 0;
 
-    // Cursor position (canvas-relative) and the currently hovered ping's MMSI.
+    // Cursor position (canvas-relative) and the currently hovered ping.
     const mouse = { x: 0, y: 0, inside: false };
     let hoveredMmsi: string | null = null;
+    // Identity of the hovered ping (mmsi + ts) so moving between two pings of
+    // the same vessel still refreshes the tooltip.
+    let hoveredKey: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -179,12 +189,39 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
         ctx.stroke();
       }
 
-      // Latest vessel pings. Cull the far hemisphere and, while doing so, find
-      // the ping nearest the cursor for hover.
+      // Hover hit-testing shared by every ping dot (track + latest pings).
       const checkHover = mouse.inside && !dragging;
       let nearest: PingHover | null = null;
       let nearestDist2 = HOVER_RADIUS * HOVER_RADIUS;
 
+      // Selected vessel's full path, drawn as individual pings (no lines).
+      const track = pingStore.track;
+      const trackMmsi = pingStore.trackMmsi;
+      if (track.length > 0) {
+        ctx.fillStyle = trackMmsi ? colorForMmsi(trackMmsi) : COLORS.track;
+        for (const point of track) {
+          const coordinates: [number, number] = [point.lon, point.lat];
+          if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+          const projected = projection(coordinates);
+          if (!projected) continue;
+          const [x, y] = projected;
+          ctx.beginPath();
+          ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
+          ctx.fill();
+
+          if (checkHover && trackMmsi) {
+            const dx = x - mouse.x;
+            const dy = y - mouse.y;
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < nearestDist2) {
+              nearestDist2 = dist2;
+              nearest = { mmsi: trackMmsi, x, y, ts: point.ts, heading: point.heading };
+            }
+          }
+        }
+      }
+
+      // Latest vessel pings.
       for (const ping of pingStore.pings) {
         const coordinates: [number, number] = [ping.lon, ping.lat];
         if (geoDistance(coordinates, center) > Math.PI / 2) continue;
@@ -203,7 +240,7 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
           const dist2 = dx * dx + dy * dy;
           if (dist2 < nearestDist2) {
             nearestDist2 = dist2;
-            nearest = { mmsi: ping.mmsi, x, y };
+            nearest = { mmsi: ping.mmsi, x, y, ts: ping.ts, heading: ping.heading };
           }
         }
       }
@@ -219,10 +256,40 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
         ctx.stroke();
       }
 
-      // Notify only when the hovered vessel changes.
-      const nextMmsi = nearest ? nearest.mmsi : null;
-      if (nextMmsi !== hoveredMmsi) {
-        hoveredMmsi = nextMmsi;
+      // Glowing pulse on the selected vessel: its dot breathes from 1× to 4×
+      // the ping size and back, once per second.
+      const highlightMmsi = pingStore.highlightMmsi;
+      if (highlightMmsi) {
+        const hp = pingStore.pings.find((p) => p.mmsi === highlightMmsi);
+        if (hp) {
+          const coordinates: [number, number] = [hp.lon, hp.lat];
+          if (geoDistance(coordinates, center) <= Math.PI / 2) {
+            const projected = projection(coordinates);
+            if (projected) {
+              const [hx, hy] = projected;
+              const pulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
+              const radius = PING_RADIUS * (1 + 3 * pulse);
+              const color = colorForMmsi(highlightMmsi);
+
+              ctx.save();
+              ctx.shadowColor = color;
+              ctx.shadowBlur = 14;
+              ctx.beginPath();
+              ctx.arc(hx, hy, radius, 0, 2 * Math.PI);
+              ctx.fillStyle = colorForMmsiAlpha(highlightMmsi, 0.2);
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+        }
+      }
+
+      // Notify when the hovered ping changes (keyed on mmsi + timestamp so
+      // moving between pings of the same track refreshes the tooltip).
+      const nextKey = nearest ? `${nearest.mmsi}|${nearest.ts}` : null;
+      if (nextKey !== hoveredKey) {
+        hoveredKey = nextKey;
+        hoveredMmsi = nearest ? nearest.mmsi : null;
         onHoverRef.current?.(nearest);
       }
     };
@@ -239,9 +306,15 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
+    // Click detection: ping under the cursor at press, and whether it moved.
+    let pressedMmsi: string | null = null;
+    let downX = 0;
+    let downY = 0;
+    let didDrag = false;
 
     const clearHover = () => {
-      if (hoveredMmsi !== null) {
+      if (hoveredKey !== null) {
+        hoveredKey = null;
         hoveredMmsi = null;
         onHoverRef.current?.(null);
       }
@@ -251,8 +324,14 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
       dragging = true;
       lastX = event.clientX;
       lastY = event.clientY;
-      // Pause auto-spin while the user is grabbing the globe, and drop any hover.
+      downX = event.clientX;
+      downY = event.clientY;
+      didDrag = false;
+      // Remember the ping under the cursor for click-to-select.
+      pressedMmsi = hoveredMmsi;
+      // Pause auto-spin / cancel any fly-to while grabbing, and drop hover.
       globe.setSpinning(false);
+      globe.cancelFlight();
       clearHover();
       canvas.setPointerCapture(event.pointerId);
       canvas.style.cursor = 'grabbing';
@@ -265,6 +344,9 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
       mouse.inside = true;
 
       if (!dragging) return;
+      if (Math.abs(event.clientX - downX) > 4 || Math.abs(event.clientY - downY) > 4) {
+        didDrag = true;
+      }
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
       lastX = event.clientX;
@@ -285,6 +367,11 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
         canvas.releasePointerCapture(event.pointerId);
       }
       canvas.style.cursor = 'grab';
+      // A press-release on a ping with no real drag is a click → select it.
+      if (!didDrag && pressedMmsi) {
+        onSelectRef.current?.(pressedMmsi);
+      }
+      pressedMmsi = null;
     };
 
     // --- Trackpad: two fingers zoom (one finger pans via pointer drag) ---
@@ -312,6 +399,9 @@ export function GlobeCanvas({ onHover }: GlobeCanvasProps) {
       // Pause auto-spin while dragging or hovering a ping so it stays readable.
       if (globe.spinning && !dragging && hoveredMmsi === null) {
         globe.advanceSpin(dt);
+      }
+      if (!dragging) {
+        globe.flyStep(dt);
       }
       draw();
       frame = requestAnimationFrame(tick);

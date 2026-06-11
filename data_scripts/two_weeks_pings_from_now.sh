@@ -2,16 +2,24 @@
 #
 # two_weeks_pings_from_now.sh — fill ais_pings with 2 weeks of hourly pings.
 #
-# For every vessel currently in static_vessel_info, generates one ping per hour
-# for the last 14 days (336 pings/vessel), ending at the current hour. Each
-# vessel travels along a great-circle route between two major world ports, so
-# the tracks cross busy shipping lanes.
+# For every vessel in static_vessel_info, generates one ping per hour for the
+# last 14 days (336 pings/vessel), ending at the current hour. Vessels split
+# 50/50:
+#   * even-indexed vessels are docked at a port anchorage, clustered ~15 m
+#     apart (phyllotaxis spiral) so they don't stack on one point;
+#   * odd-indexed vessels are scattered across open ocean and drift slowly
+#     along a fixed heading.
+# All positions are sampled in water, so ships never appear on land.
 #
 # Each ping has only: mmsi, ts (timestamp), position (PostGIS point), heading.
 #
-# This REPLACES any existing rows in ais_pings (truncates first) so the window
-# is always "the last two weeks from now". Targets the container from
-# deployment_scripts/deploy_database.sh.
+# Water areas / port anchorages are inspired by data_scripts/aois.md, but use
+# clean open-water boxes and offshore anchorages: the file's SEA entries are
+# bounding boxes that include coastline, and the Arctic/Southern/Pacific ocean
+# polygons enclose land or cross the antimeridian.
+#
+# This REPLACES any existing rows in ais_pings (truncates first). Targets the
+# container from deployment_scripts/deploy_database.sh.
 #
 set -euo pipefail
 
@@ -53,37 +61,57 @@ CREATE TABLE IF NOT EXISTS ais_pings (
     ts       TIMESTAMPTZ NOT NULL,
     position GEOGRAPHY(Point, 4326) NOT NULL,
     heading  NUMERIC(5,2),
+    speed    NUMERIC(5,2),            -- speed over ground (knots)
     PRIMARY KEY (mmsi, ts)
 );
+ALTER TABLE ais_pings ADD COLUMN IF NOT EXISTS speed NUMERIC(5,2);
 CREATE INDEX IF NOT EXISTS ais_pings_ts_idx ON ais_pings (ts);
 CREATE INDEX IF NOT EXISTS ais_pings_position_gix ON ais_pings USING GIST (position);
 
 -- Always (re)build the trailing two-week window.
 TRUNCATE TABLE ais_pings;
 
-INSERT INTO ais_pings (mmsi, ts, position, heading)
-WITH ports(idx, lon, lat) AS (
+INSERT INTO ais_pings (mmsi, ts, position, heading, speed)
+WITH water(geom) AS (
+    -- Open-ocean sampling areas: well offshore, no antimeridian crossings.
+    SELECT ST_Collect(ARRAY[
+        ST_MakeEnvelope( -45,  30,  -20,  50, 4326),  -- North Atlantic
+        ST_MakeEnvelope( -40,   5,  -20,  28, 4326),  -- Central Atlantic
+        ST_MakeEnvelope( -30, -35,   -5, -10, 4326),  -- South Atlantic (east)
+        ST_MakeEnvelope( -45, -45,  -25, -20, 4326),  -- South Atlantic (west)
+        ST_MakeEnvelope(  55, -35,   95,  -5, 4326),  -- South Indian Ocean
+        ST_MakeEnvelope(  58,  10,   70,  20, 4326),  -- Arabian Sea
+        ST_MakeEnvelope(  84,   8,   93,  17, 4326),  -- Bay of Bengal
+        ST_MakeEnvelope( 150, -25,  175,  -5, 4326),  -- SW Pacific
+        ST_MakeEnvelope( 150,  20,  175,  40, 4326),  -- NW Pacific
+        ST_MakeEnvelope(-150, -30, -120,  -5, 4326),  -- Central South Pacific
+        ST_MakeEnvelope(-150,  25, -130,  45, 4326),  -- NE Pacific
+        ST_MakeEnvelope(-120, -35,  -95, -10, 4326)   -- SE Pacific
+    ]) AS geom
+),
+-- Offshore anchorage points (in water, just outside the harbour).
+ports(idx, lon, lat) AS (
     VALUES
-        (0,  121.80,  31.23),  -- Shanghai
-        (1,  103.85,   1.29),  -- Singapore
-        (2,    4.40,  51.95),  -- Rotterdam
-        (3, -118.27,  33.74),  -- Los Angeles
-        (4,    9.97,  53.55),  -- Hamburg
-        (5,  -74.05,  40.65),  -- New York
-        (6,  114.17,  22.30),  -- Hong Kong
-        (7,  129.04,  35.10),  -- Busan
-        (8,   55.03,  25.01),  -- Dubai (Jebel Ali)
-        (9,  -46.30, -23.96),  -- Santos
-        (10,  31.05, -29.87),  -- Durban
-        (11, 151.21, -33.86),  -- Sydney
-        (12, -79.90,   9.36),  -- Colon (Panama)
-        (13,  32.55,  29.97),  -- Suez
-        (14,  23.63,  37.94),  -- Piraeus
-        (15,  72.84,  18.94),  -- Mumbai
-        (16, 139.77,  35.62),  -- Tokyo
-        (17,   4.40,  51.26),  -- Antwerp
-        (18,  -0.32,  39.44),  -- Valencia
-        (19,  30.72,  46.48)   -- Odessa
+        (0,  122.20,  30.90),  -- Shanghai approach
+        (1,  103.80,   1.18),  -- Singapore Strait
+        (2,    3.80,  52.00),  -- Rotterdam approach
+        (3, -118.15,  33.68),  -- Los Angeles / Long Beach
+        (4,  -73.85,  40.45),  -- New York approach
+        (5,  114.15,  22.20),  -- Hong Kong anchorage
+        (6,  129.10,  35.00),  -- Busan approach
+        (7,   54.95,  25.00),  -- Dubai (Jebel Ali)
+        (8,  -46.20, -24.10),  -- Santos approach
+        (9,   31.15, -29.92),  -- Durban approach
+        (10, 151.30, -33.90),  -- Sydney approach
+        (11, -79.85,   9.45),  -- Colon (Panama, Caribbean)
+        (12,  32.40,  31.40),  -- Port Said / Suez approach
+        (13,  23.55,  37.88),  -- Piraeus (Saronic Gulf)
+        (14,  72.70,  18.90),  -- Mumbai approach
+        (15, 139.85,  35.35),  -- Tokyo Bay
+        (16,   3.40,  51.55),  -- Antwerp / Westerschelde mouth
+        (17,  -0.10,  39.40),  -- Valencia approach
+        (18,  30.85,  46.45),  -- Odessa (Black Sea)
+        (19,  -5.50,  36.00)   -- Gibraltar Strait
 ),
 nports AS (
     SELECT count(*)::int AS n FROM ports
@@ -92,72 +120,95 @@ vessels AS (
     SELECT mmsi, (row_number() OVER (ORDER BY mmsi) - 1)::int AS v
     FROM static_vessel_info
 ),
-routes AS (
-    -- origin = v % n; destination is a different port (guaranteed via step in 1..n-1).
-    SELECT
-        ve.mmsi,
-        ve.v,
-        o.lon AS olon, o.lat AS olat,
-        d.lon AS dlon, d.lat AS dlat
-    FROM vessels ve
-    CROSS JOIN nports np
-    JOIN ports o ON o.idx = ve.v % np.n
-    JOIN ports d ON d.idx = ((ve.v % np.n) + 1 + (ve.v % (np.n - 1))) % np.n
+hours AS (
+    -- i counts hours; step 3 → one ping every 3 hours over the last 14 days.
+    SELECT generate_series(0, 336, 3) AS i
 ),
-positions AS (
-    SELECT
-        r.mmsi,
-        r.v,
-        r.olon, r.olat, r.dlon, r.dlat,
-        date_trunc('hour', now()) - ((335 - i) * INTERVAL '1 hour') AS ts,
-        -- How far along the route this vessel is at this hour. Each vessel gets
-        -- its own start phase (golden-ratio spread) and pace, so at any instant
-        -- ships are scattered along their routes — most out in open ocean —
-        -- instead of all sitting at the origin/destination port.
-        (r.v * 0.6180339887::float8
-            + (i::float8 / 335.0) * (0.5 + (r.v % 7) * 0.15)) AS travel
-    FROM routes r
-    CROSS JOIN generate_series(0, 335) AS i
+
+----------------------------------------------------------------------
+-- Ocean half (odd-indexed vessels): scattered in open water, drifting.
+----------------------------------------------------------------------
+ocean_vessels AS (
+    SELECT mmsi, (row_number() OVER (ORDER BY mmsi) - 1)::int AS oi
+    FROM vessels
+    WHERE v % 2 = 1
 ),
-samples AS (
+gen AS (
+    -- One random point per ocean vessel, guaranteed inside the water areas.
+    SELECT (dp).path[1] AS idx, (dp).geom AS pt
+    FROM (
+        SELECT ST_Dump(
+                   ST_GeneratePoints(w.geom, (SELECT count(*)::int FROM ocean_vessels), 20260611)
+               ) AS dp
+        FROM water w
+    ) s
+),
+ocean_anchors AS (
     SELECT
-        p.mmsi,
-        p.ts,
-        -- wrap travel into [0,1) and interpolate origin -> destination
-        (p.olon + (p.dlon - p.olon) * (p.travel - floor(p.travel)))::float8 AS base_lon,
-        (p.olat + (p.dlat - p.olat) * (p.travel - floor(p.travel)))::float8 AS base_lat,
-        -- Per-vessel offset on a phyllotaxis spiral: distinct per vessel and
-        -- ~15 m between neighbours, so co-routed ships fan out instead of
-        -- stacking on one point. radius in metres, angle in radians.
-        (9.0 * sqrt(p.v::float8)) AS off_r,
-        (p.v * 2.399963229728653::float8) AS off_theta,
-        round(
-            mod(
-                (degrees(atan2(
-                    sin(radians((p.dlon - p.olon)::float8)) * cos(radians(p.dlat::float8)),
-                    cos(radians(p.olat::float8)) * sin(radians(p.dlat::float8))
-                      - sin(radians(p.olat::float8)) * cos(radians(p.dlat::float8))
-                        * cos(radians((p.dlon - p.olon)::float8))
-                )) + 360)::numeric,
-                360
-            ),
-            2
-        ) AS heading
-    FROM positions p
-)
-SELECT
-    mmsi,
-    ts,
-    ST_SetSRID(
+        ov.mmsi,
+        ST_X(g.pt) AS ax,
+        ST_Y(g.pt) AS ay,
+        (ov.oi * 137.50776405)::float8        AS bearing,  -- degrees, spread out
+        -- Drift in degrees/hour. Per 3-hour step the ground distance is
+        -- 180 * speed deg-of-arc → ~3.6–5.4 nm, so consecutive pings are
+        -- always >3 miles apart and the 2-week track is clearly visible.
+        (0.02 + (ov.oi % 6) * 0.002)::float8  AS speed,
+        (8 + (ov.oi % 13))::numeric           AS speed_kn  -- speed over ground (8–20 knots)
+    FROM ocean_vessels ov
+    JOIN gen g ON g.idx = ov.oi + 1
+),
+ocean_pings AS (
+    SELECT
+        a.mmsi,
+        date_trunc('hour', now()) - ((336 - h.i) * INTERVAL '1 hour') AS ts,
         ST_MakePoint(
-            -- metres → degrees (longitude scaled by cos(latitude)).
-            base_lon + (off_r * cos(off_theta)) / (111320.0 * cos(radians(base_lat))),
-            base_lat + (off_r * sin(off_theta)) / 111320.0
-        ),
-        4326
-    )::geography AS position,
-    heading
-FROM samples;
+            a.ax + (h.i - 336) * a.speed * sin(radians(a.bearing)) / cos(radians(a.ay)),
+            a.ay + (h.i - 336) * a.speed * cos(radians(a.bearing))
+        ) AS pt,
+        round(mod(a.bearing::numeric, 360), 2) AS heading,
+        a.speed_kn AS speed
+    FROM ocean_anchors a
+    CROSS JOIN hours h
+),
+
+----------------------------------------------------------------------
+-- Port half (even-indexed vessels): docked, clustered ~15 m apart.
+----------------------------------------------------------------------
+port_vessels AS (
+    SELECT mmsi, (v / 2) AS pv
+    FROM vessels
+    WHERE v % 2 = 0
+),
+port_anchors AS (
+    SELECT
+        pvs.mmsi,
+        p.lon AS plon,
+        p.lat AS plat,
+        -- Phyllotaxis spiral within the port: ~15 m between neighbours.
+        (11.0 * sqrt((pvs.pv / np.n)::float8)) AS off_r,        -- metres
+        (pvs.pv * 2.399963229728653::float8)   AS off_theta,    -- radians
+        (pvs.pv * 137.50776405)::numeric        AS bearing,      -- moored heading
+        0::numeric                              AS speed_kn      -- docked
+    FROM port_vessels pvs
+    CROSS JOIN nports np
+    JOIN ports p ON p.idx = pvs.pv % np.n
+),
+port_pings AS (
+    SELECT
+        a.mmsi,
+        date_trunc('hour', now()) - ((336 - h.i) * INTERVAL '1 hour') AS ts,
+        ST_MakePoint(
+            a.plon + (a.off_r * cos(a.off_theta)) / (111320.0 * cos(radians(a.plat))),
+            a.plat + (a.off_r * sin(a.off_theta)) / 111320.0
+        ) AS pt,
+        round(mod(a.bearing, 360), 2) AS heading,
+        a.speed_kn AS speed
+    FROM port_anchors a
+    CROSS JOIN hours h
+)
+SELECT mmsi, ts, ST_SetSRID(pt, 4326)::geography AS position, heading, speed FROM ocean_pings
+UNION ALL
+SELECT mmsi, ts, ST_SetSRID(pt, 4326)::geography AS position, heading, speed FROM port_pings;
 SQL
 
 # --- Summary ----------------------------------------------------------------

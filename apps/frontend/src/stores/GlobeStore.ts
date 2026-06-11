@@ -21,7 +21,7 @@ export class GlobeStore {
   rpm = 1;
 
   /** Whether the globe is auto-rotating. */
-  spinning = true;
+  spinning = false;
 
   /** Scale multiplier applied to the base projection radius. */
   zoom = 1;
@@ -34,6 +34,11 @@ export class GlobeStore {
 
   /** Whether the latitude/longitude grid (graticule) is drawn. */
   showGraticule = true;
+
+  /** Smooth "fly to" animation state. */
+  flying = false;
+  private targetLambda = 0;
+  private targetPhi = DEFAULT_PHI;
 
   constructor() {
     makeAutoObservable(this);
@@ -61,6 +66,40 @@ export class GlobeStore {
   rotateBy(dLambda: number, dPhi: number): void {
     this.rotationLambda = (this.rotationLambda + dLambda) % 360;
     this.rotationPhi = clamp(this.rotationPhi + dPhi, -MAX_PHI, MAX_PHI);
+  }
+
+  /** Smoothly rotate so (lon, lat) ends up at the centre. Zoom is unchanged. */
+  flyTo(lon: number, lat: number): void {
+    this.targetLambda = -lon;
+    this.targetPhi = clamp(-lat, -MAX_PHI, MAX_PHI);
+    this.spinning = false;
+    this.flying = true;
+  }
+
+  cancelFlight(): void {
+    this.flying = false;
+  }
+
+  /** Advance the fly-to animation by one frame; no-op when not flying. */
+  flyStep(dtMs: number): void {
+    if (!this.flying) return;
+    const alpha = 1 - Math.exp(-dtMs * 0.008);
+
+    // Shortest angular path for longitude rotation.
+    let dLambda = (this.targetLambda - this.rotationLambda) % 360;
+    if (dLambda > 180) dLambda -= 360;
+    if (dLambda < -180) dLambda += 360;
+    const dPhi = this.targetPhi - this.rotationPhi;
+
+    if (Math.abs(dLambda) < 0.05 && Math.abs(dPhi) < 0.05) {
+      this.rotationLambda = this.targetLambda;
+      this.rotationPhi = this.targetPhi;
+      this.flying = false;
+      return;
+    }
+
+    this.rotationLambda += dLambda * alpha;
+    this.rotationPhi += dPhi * alpha;
   }
 
   setSpinning(spinning: boolean): void {

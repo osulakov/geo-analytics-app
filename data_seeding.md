@@ -1,0 +1,3 @@
+deployment_scripts/deploy_database.sh
+data_scripts/seed_static_vessel_info.sh
+data_scripts/two_weeks_pings_from_now.sh

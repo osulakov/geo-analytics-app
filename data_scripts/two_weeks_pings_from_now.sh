@@ -96,6 +96,7 @@ routes AS (
     -- origin = v % n; destination is a different port (guaranteed via step in 1..n-1).
     SELECT
         ve.mmsi,
+        ve.v,
         o.lon AS olon, o.lat AS olat,
         d.lon AS dlon, d.lat AS dlat
     FROM vessels ve
@@ -103,31 +104,58 @@ routes AS (
     JOIN ports o ON o.idx = ve.v % np.n
     JOIN ports d ON d.idx = ((ve.v % np.n) + 1 + (ve.v % (np.n - 1))) % np.n
 ),
-samples AS (
+positions AS (
     SELECT
         r.mmsi,
+        r.v,
+        r.olon, r.olat, r.dlon, r.dlat,
         date_trunc('hour', now()) - ((335 - i) * INTERVAL '1 hour') AS ts,
-        (r.olon + (r.dlon - r.olon) * (i::float8 / 335.0))::float8 AS lon,
-        (r.olat + (r.dlat - r.olat) * (i::float8 / 335.0))::float8 AS lat,
+        -- How far along the route this vessel is at this hour. Each vessel gets
+        -- its own start phase (golden-ratio spread) and pace, so at any instant
+        -- ships are scattered along their routes — most out in open ocean —
+        -- instead of all sitting at the origin/destination port.
+        (r.v * 0.6180339887::float8
+            + (i::float8 / 335.0) * (0.5 + (r.v % 7) * 0.15)) AS travel
+    FROM routes r
+    CROSS JOIN generate_series(0, 335) AS i
+),
+samples AS (
+    SELECT
+        p.mmsi,
+        p.ts,
+        -- wrap travel into [0,1) and interpolate origin -> destination
+        (p.olon + (p.dlon - p.olon) * (p.travel - floor(p.travel)))::float8 AS base_lon,
+        (p.olat + (p.dlat - p.olat) * (p.travel - floor(p.travel)))::float8 AS base_lat,
+        -- Per-vessel offset on a phyllotaxis spiral: distinct per vessel and
+        -- ~15 m between neighbours, so co-routed ships fan out instead of
+        -- stacking on one point. radius in metres, angle in radians.
+        (9.0 * sqrt(p.v::float8)) AS off_r,
+        (p.v * 2.399963229728653::float8) AS off_theta,
         round(
             mod(
                 (degrees(atan2(
-                    sin(radians((r.dlon - r.olon)::float8)) * cos(radians(r.dlat::float8)),
-                    cos(radians(r.olat::float8)) * sin(radians(r.dlat::float8))
-                      - sin(radians(r.olat::float8)) * cos(radians(r.dlat::float8))
-                        * cos(radians((r.dlon - r.olon)::float8))
+                    sin(radians((p.dlon - p.olon)::float8)) * cos(radians(p.dlat::float8)),
+                    cos(radians(p.olat::float8)) * sin(radians(p.dlat::float8))
+                      - sin(radians(p.olat::float8)) * cos(radians(p.dlat::float8))
+                        * cos(radians((p.dlon - p.olon)::float8))
                 )) + 360)::numeric,
                 360
             ),
             2
         ) AS heading
-    FROM routes r
-    CROSS JOIN generate_series(0, 335) AS i
+    FROM positions p
 )
 SELECT
     mmsi,
     ts,
-    ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography AS position,
+    ST_SetSRID(
+        ST_MakePoint(
+            -- metres → degrees (longitude scaled by cos(latitude)).
+            base_lon + (off_r * cos(off_theta)) / (111320.0 * cos(radians(base_lat))),
+            base_lat + (off_r * sin(off_theta)) / 111320.0
+        ),
+        4326
+    )::geography AS position,
     heading
 FROM samples;
 SQL

@@ -11,6 +11,9 @@ export const GlobeControls = observer(function GlobeControls() {
 
   return (
     <div className="globe-controls">
+      <div className="globe-controls__zoom" title="Current zoom level">
+        {globe.zoom.toFixed(1)}×
+      </div>
       <button
         type="button"
         title="Zoom in"

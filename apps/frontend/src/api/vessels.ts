@@ -25,3 +25,13 @@ export async function fetchStaticVesselInfo(): Promise<StaticVesselInfo[]> {
   }
   return (await response.json()) as StaticVesselInfo[];
 }
+
+/** Fetch a single vessel's static info by MMSI (null if not found). */
+export async function fetchVesselByMmsi(mmsi: string): Promise<StaticVesselInfo | null> {
+  const response = await fetch(`/api/vessels/${mmsi}`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch vessel ${mmsi}: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as StaticVesselInfo;
+}

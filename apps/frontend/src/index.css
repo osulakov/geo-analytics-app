@@ -71,6 +71,19 @@ body {
   gap: 6px;
 }
 
+.globe-controls__zoom {
+  width: 36px;
+  padding: 3px 0;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-fg);
+  background: var(--surface-control);
+  border-radius: var(--radius-md);
+  backdrop-filter: var(--blur-control);
+  opacity: 0.85;
+}
+
 .globe-controls button {
   width: 36px;
   height: 36px;
@@ -225,4 +238,47 @@ body {
 .chat-widget__input button[type='submit']:disabled {
   opacity: var(--disabled-opacity);
   cursor: default;
+}
+
+.vessel-tooltip {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  min-width: 210px;
+  padding: 15px 17px;
+  background: var(--surface-panel);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--blur-panel);
+  font-size: 12px;
+  color: var(--color-fg);
+}
+
+.vessel-tooltip__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 6px;
+}
+
+.vessel-tooltip__list {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+  /* 20% smaller than the tooltip's base font; title keeps its own size. */
+  font-size: 0.8em;
+}
+
+.vessel-tooltip__list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vessel-tooltip__list dt {
+  opacity: 0.55;
+}
+
+.vessel-tooltip__list dd {
+  margin: 0;
+  text-align: right;
 }

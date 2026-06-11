@@ -59,6 +59,16 @@ export const GlobeControls = observer(function GlobeControls() {
       </button>
       <button
         type="button"
+        className={globe.showEez ? 'globe-controls__label active' : 'globe-controls__label'}
+        title={globe.showEez ? 'Hide EEZ boundaries' : 'Show EEZ boundaries'}
+        aria-label={globe.showEez ? 'Hide EEZ boundaries' : 'Show EEZ boundaries'}
+        aria-pressed={globe.showEez}
+        onClick={() => globe.toggleEez()}
+      >
+        EEZ
+      </button>
+      <button
+        type="button"
         title={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
         aria-label={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
         onClick={() => globe.toggleSpinning()}

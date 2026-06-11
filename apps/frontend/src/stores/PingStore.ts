@@ -15,6 +15,11 @@ function toDateInput(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export interface VesselTrack {
+  mmsi: string;
+  points: TrackPoint[];
+}
+
 /** Holds the latest ping per vessel (within a date range) for the globe. */
 export class PingStore {
   pings: LatestPing[] = [];
@@ -24,12 +29,15 @@ export class PingStore {
   fromDate: string;
   toDate: string;
 
-  // Full track of one vessel, shown on demand from the vessel modal.
-  trackMmsi: string | null = null;
-  track: TrackPoint[] = [];
+  // Loaded vessel tracks (one from the modal, or many from a group).
+  tracks: VesselTrack[] = [];
+  private trackToken = 0;
 
-  // Vessel whose latest ping pulses (selected from the Vessels list).
-  highlightMmsi: string | null = null;
+  // Vessels whose latest ping pulses (single selection or a whole group).
+  highlightMmsis: string[] = [];
+
+  // Group currently shown on the map (its eye toggle is "on"), if any.
+  shownGroupId: number | null = null;
 
   constructor() {
     const today = new Date();
@@ -48,27 +56,61 @@ export class PingStore {
     void this.load();
   }
 
-  /** Load and show the full path for a vessel. */
+  /** Load and show the full path for a single vessel (within the date range). */
   async showTrack(mmsi: string): Promise<void> {
-    this.trackMmsi = mmsi;
-    this.track = [];
+    this.shownGroupId = null;
+    await this.showTracks([mmsi]);
+  }
+
+  /** Show a whole group: glow every member and load all their tracks. */
+  async showGroup(groupId: number, mmsis: string[]): Promise<void> {
+    this.shownGroupId = groupId;
+    this.highlightMmsis = mmsis;
+    await this.showTracks(mmsis);
+  }
+
+  /** Hide the shown group (clears its glow and tracks). */
+  hideGroup(): void {
+    this.highlightMmsis = [];
+    this.clearTracks();
+  }
+
+  /** Load and show the full paths for several vessels (within the date range). */
+  async showTracks(mmsis: string[]): Promise<void> {
+    const token = ++this.trackToken;
+    this.tracks = [];
     try {
-      const track = await fetchVesselTrack(mmsi);
+      const results = await Promise.all(
+        mmsis.map(async (mmsi) => ({
+          mmsi,
+          points: await fetchVesselTrack(mmsi, this.fromDate, this.toDate),
+        })),
+      );
       runInAction(() => {
-        if (this.trackMmsi === mmsi) this.track = track;
+        if (this.trackToken === token) this.tracks = results;
       });
     } catch (error) {
-      console.error(`Failed to load track for ${mmsi}:`, error);
+      console.error('Failed to load tracks:', error);
     }
   }
 
-  clearTrack(): void {
-    this.trackMmsi = null;
-    this.track = [];
+  clearTracks(): void {
+    this.trackToken++;
+    this.tracks = [];
+    this.shownGroupId = null;
   }
 
   setHighlight(mmsi: string | null): void {
-    this.highlightMmsi = mmsi;
+    this.highlightMmsis = mmsi ? [mmsi] : [];
+    this.shownGroupId = null;
+  }
+
+  setHighlightMany(mmsis: string[]): void {
+    this.highlightMmsis = mmsis;
+  }
+
+  clearHighlight(): void {
+    this.highlightMmsis = [];
   }
 
   async load(): Promise<void> {

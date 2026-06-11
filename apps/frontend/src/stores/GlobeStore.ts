@@ -35,6 +35,9 @@ export class GlobeStore {
   /** Whether the latitude/longitude grid (graticule) is drawn. */
   showGraticule = true;
 
+  /** Whether the Exclusive Economic Zone (EEZ) boundaries are drawn. */
+  showEez = false;
+
   /** Smooth "fly to" animation state. */
   flying = false;
   private targetLambda = 0;
@@ -66,6 +69,12 @@ export class GlobeStore {
   rotateBy(dLambda: number, dPhi: number): void {
     this.rotationLambda = (this.rotationLambda + dLambda) % 360;
     this.rotationPhi = clamp(this.rotationPhi + dPhi, -MAX_PHI, MAX_PHI);
+  }
+
+  /** Set the absolute orientation in degrees (phi clamped to the safe range). */
+  setRotation(lambda: number, phi: number): void {
+    this.rotationLambda = lambda % 360;
+    this.rotationPhi = clamp(phi, -MAX_PHI, MAX_PHI);
   }
 
   /** Smoothly rotate so (lon, lat) ends up at the centre. Zoom is unchanged. */
@@ -112,6 +121,10 @@ export class GlobeStore {
 
   toggleGraticule(): void {
     this.showGraticule = !this.showGraticule;
+  }
+
+  toggleEez(): void {
+    this.showEez = !this.showEez;
   }
 
   setRpm(rpm: number): void {

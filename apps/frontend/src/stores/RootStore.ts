@@ -1,5 +1,6 @@
 import { ChatStore } from './ChatStore';
 import { GlobeStore } from './GlobeStore';
+import { GroupStore } from './GroupStore';
 import { PingStore } from './PingStore';
 import { VesselStore } from './VesselStore';
 
@@ -9,11 +10,13 @@ export class RootStore {
   chat: ChatStore;
   ping: PingStore;
   vessel: VesselStore;
+  group: GroupStore;
 
   constructor() {
     this.globe = new GlobeStore();
     this.chat = new ChatStore();
     this.ping = new PingStore();
     this.vessel = new VesselStore();
+    this.group = new GroupStore();
   }
 }

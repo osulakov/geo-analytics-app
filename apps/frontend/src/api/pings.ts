@@ -14,9 +14,18 @@ export interface TrackPoint {
   heading: number | null;
 }
 
-/** Fetch the full ordered track (all pings) for one vessel. */
-export async function fetchVesselTrack(mmsi: string): Promise<TrackPoint[]> {
-  const response = await fetch(`/api/pings/track/${mmsi}`);
+/** Fetch a vessel's ordered track, optionally limited to a date range. */
+export async function fetchVesselTrack(
+  mmsi: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<TrackPoint[]> {
+  const params = new URLSearchParams();
+  if (fromDate) params.set('from', `${fromDate}T00:00:00Z`);
+  if (toDate) params.set('to', `${toDate}T23:59:59Z`);
+  const query = params.toString();
+
+  const response = await fetch(`/api/pings/track/${mmsi}${query ? `?${query}` : ''}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch track for ${mmsi}: ${response.status}`);
   }

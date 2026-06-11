@@ -5,6 +5,10 @@ import type { Feature, FeatureCollection, Point } from 'geojson';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 
 import countries110m from 'world-atlas/countries-110m.json';
+// Simplified EEZ geometry (~1.3 MB, down from the 33 MB source via mapshaper)
+// so it can be re-projected every frame without tanking the frame rate.
+// Resolved to a static URL and fetched lazily the first time the layer is on.
+import eezUrl from '../assets/eez-simplified.geojson?url';
 import { useStores } from '../stores/StoreContext';
 import { colorForMmsi, colorForMmsiAlpha } from '../utils/colorMap';
 
@@ -15,12 +19,96 @@ const land = feature(topology, countriesObject) as unknown as FeatureCollection;
 const boundaries = mesh(topology, countriesObject);
 const graticule = geoGraticule10();
 
+// Color per maritime-boundary LINE_TYPE. Anything unlisted uses the default.
+const EEZ_LINE_COLORS: Record<string, string> = {
+  'Connection line': '#8a93a3',
+  Treaty: '#1dc09c',
+  'Median line': '#5aa9ff',
+  '200 NM': '#3b82f6',
+  'Court ruling': '#a78bfa',
+  'Joint regime': '#22d3ee',
+  'Unilateral claim (undisputed)': '#facc15',
+  'Unsettled median line (land)': '#fb923c',
+  'Unsettled median line (maritime)': '#f97316',
+  'Unsettled (maritime)': '#ef4444',
+  'Unsettled (land)': '#f87171',
+  '12 NM': '#e879f9',
+};
+const EEZ_DEFAULT_COLOR = 'rgba(120, 200, 255, 0.7)';
+
+// EEZ boundaries, fetched lazily the first time the layer is toggled on, then
+// grouped by color (one FeatureCollection per color) and cached for the page.
+interface EezGroup {
+  color: string;
+  collection: FeatureCollection;
+}
+interface EezPoint {
+  lon: number;
+  lat: number;
+  name: string;
+}
+let eezGroups: EezGroup[] | null = null;
+let eezPoints: EezPoint[] | null = null;
+let eezLoading = false;
+
+function eezLabel(props: Feature['properties']): string {
+  const p = (props ?? {}) as Record<string, unknown>;
+  return (
+    (p.LINE_NAME as string) ||
+    (p.EEZ1 as string) ||
+    (p.TERRITORY1 as string) ||
+    'EEZ boundary'
+  );
+}
+
+// Walk arbitrarily-nested GeoJSON coordinates, pushing each [lon, lat] vertex.
+function collectPositions(coords: unknown, name: string, out: EezPoint[]): void {
+  if (!Array.isArray(coords)) return;
+  if (typeof coords[0] === 'number') {
+    out.push({ lon: coords[0] as number, lat: coords[1] as number, name });
+    return;
+  }
+  for (const child of coords) collectPositions(child, name, out);
+}
+
+function loadEez(): void {
+  if (eezGroups || eezLoading) return;
+  eezLoading = true;
+  fetch(eezUrl)
+    .then((res) => res.json())
+    .then((data: FeatureCollection) => {
+      const byColor = new Map<string, Feature[]>();
+      const points: EezPoint[] = [];
+      for (const feat of data.features) {
+        const type = (feat.properties?.LINE_TYPE as string | undefined) ?? '';
+        const color = EEZ_LINE_COLORS[type] ?? EEZ_DEFAULT_COLOR;
+        const group = byColor.get(color);
+        if (group) group.push(feat);
+        else byColor.set(color, [feat]);
+
+        if (feat.geometry && 'coordinates' in feat.geometry) {
+          collectPositions(feat.geometry.coordinates, eezLabel(feat.properties), points);
+        }
+      }
+      eezGroups = [...byColor.entries()].map(([color, features]) => ({
+        color,
+        collection: { type: 'FeatureCollection', features },
+      }));
+      eezPoints = points;
+    })
+    .catch(() => {
+      // Allow a later toggle to retry the fetch.
+      eezLoading = false;
+    });
+}
+
 // Grey palette for the basemap.
 const COLORS = {
   ocean: '#2a2f37',
   land: '#3b4250',
   boundary: '#828b99',
   graticule: 'rgba(170, 185, 205, 0.45)',
+  eez: 'rgba(120, 200, 255, 0.55)',
   outline: 'rgba(148, 163, 184, 0.35)',
   marker: '#ef4444',
   markerOutline: 'rgba(0, 0, 0, 0.45)',
@@ -38,6 +126,8 @@ const MARKER_RADIUS = 5;
 // Ping marker radius and the pixel distance within which a ping is "hovered".
 const PING_RADIUS = 2.5;
 const HOVER_RADIUS = 8;
+// Pixel tolerance for hovering an EEZ line.
+const EEZ_HOVER_RADIUS = 8;
 
 /** A ping currently under the cursor, with its on-screen position. */
 export interface PingHover {
@@ -48,9 +138,18 @@ export interface PingHover {
   heading: number | null;
 }
 
+/** An EEZ boundary under the cursor. */
+export interface EezHover {
+  name: string;
+  x: number;
+  y: number;
+}
+
 interface GlobeCanvasProps {
   /** Called when the hovered ping changes (null when nothing is hovered). */
   onHover?: (hover: PingHover | null) => void;
+  /** Called when the hovered EEZ boundary changes. */
+  onEezHover?: (hover: EezHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
 }
@@ -65,7 +164,7 @@ const markers: Feature<Point>[] = [
   },
 ];
 
-export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
+export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps) {
   const stores = useStores();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,6 +172,8 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
   // Keep the latest callbacks reachable from the (run-once) effect.
   const onHoverRef = useRef(onHover);
   onHoverRef.current = onHover;
+  const onEezHoverRef = useRef(onEezHover);
+  onEezHoverRef.current = onEezHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -99,6 +200,8 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
     // Identity of the hovered ping (mmsi + ts) so moving between two pings of
     // the same vessel still refreshes the tooltip.
     let hoveredKey: string | null = null;
+    // Name of the hovered EEZ boundary (for change detection).
+    let eezHoveredName: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -163,6 +266,20 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
       ctx.lineWidth = 0.6;
       ctx.stroke();
 
+      // Exclusive Economic Zone boundaries, colored by LINE_TYPE.
+      if (globe.showEez) {
+        loadEez();
+        if (eezGroups) {
+          ctx.lineWidth = 2;
+          for (const group of eezGroups) {
+            ctx.beginPath();
+            path(group.collection);
+            ctx.strokeStyle = group.color;
+            ctx.stroke();
+          }
+        }
+      }
+
       // Sphere outline.
       ctx.beginPath();
       path({ type: 'Sphere' });
@@ -194,12 +311,10 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
       let nearest: PingHover | null = null;
       let nearestDist2 = HOVER_RADIUS * HOVER_RADIUS;
 
-      // Selected vessel's full path, drawn as individual pings (no lines).
-      const track = pingStore.track;
-      const trackMmsi = pingStore.trackMmsi;
-      if (track.length > 0) {
-        ctx.fillStyle = trackMmsi ? colorForMmsi(trackMmsi) : COLORS.track;
-        for (const point of track) {
+      // Loaded vessel tracks, drawn as individual pings (no lines).
+      for (const tr of pingStore.tracks) {
+        ctx.fillStyle = colorForMmsi(tr.mmsi);
+        for (const point of tr.points) {
           const coordinates: [number, number] = [point.lon, point.lat];
           if (geoDistance(coordinates, center) > Math.PI / 2) continue;
           const projected = projection(coordinates);
@@ -209,13 +324,13 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
           ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
           ctx.fill();
 
-          if (checkHover && trackMmsi) {
+          if (checkHover) {
             const dx = x - mouse.x;
             const dy = y - mouse.y;
             const dist2 = dx * dx + dy * dy;
             if (dist2 < nearestDist2) {
               nearestDist2 = dist2;
-              nearest = { mmsi: trackMmsi, x, y, ts: point.ts, heading: point.heading };
+              nearest = { mmsi: tr.mmsi, x, y, ts: point.ts, heading: point.heading };
             }
           }
         }
@@ -256,31 +371,30 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
         ctx.stroke();
       }
 
-      // Glowing pulse on the selected vessel: its dot breathes from 1× to 4×
-      // the ping size and back, once per second.
-      const highlightMmsi = pingStore.highlightMmsi;
-      if (highlightMmsi) {
-        const hp = pingStore.pings.find((p) => p.mmsi === highlightMmsi);
-        if (hp) {
+      // Glowing pulse on selected/highlighted vessels: each dot breathes from
+      // 1× to 4× the ping size and back, once per second.
+      if (pingStore.highlightMmsis.length > 0) {
+        const byMmsi = new Map(pingStore.pings.map((p) => [p.mmsi, p]));
+        const pulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
+        const radius = PING_RADIUS * (1 + 3 * pulse);
+        for (const hm of pingStore.highlightMmsis) {
+          const hp = byMmsi.get(hm);
+          if (!hp) continue;
           const coordinates: [number, number] = [hp.lon, hp.lat];
-          if (geoDistance(coordinates, center) <= Math.PI / 2) {
-            const projected = projection(coordinates);
-            if (projected) {
-              const [hx, hy] = projected;
-              const pulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
-              const radius = PING_RADIUS * (1 + 3 * pulse);
-              const color = colorForMmsi(highlightMmsi);
+          if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+          const projected = projection(coordinates);
+          if (!projected) continue;
+          const [hx, hy] = projected;
+          const color = colorForMmsi(hm);
 
-              ctx.save();
-              ctx.shadowColor = color;
-              ctx.shadowBlur = 14;
-              ctx.beginPath();
-              ctx.arc(hx, hy, radius, 0, 2 * Math.PI);
-              ctx.fillStyle = colorForMmsiAlpha(highlightMmsi, 0.2);
-              ctx.fill();
-              ctx.restore();
-            }
-          }
+          ctx.save();
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(hx, hy, radius, 0, 2 * Math.PI);
+          ctx.fillStyle = colorForMmsiAlpha(hm, 0.2);
+          ctx.fill();
+          ctx.restore();
         }
       }
 
@@ -291,6 +405,46 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
         hoveredKey = nextKey;
         hoveredMmsi = nearest ? nearest.mmsi : null;
         onHoverRef.current?.(nearest);
+      }
+
+      // EEZ boundary hover (only when no ping is under the cursor). Find the
+      // nearest boundary vertex by planar distance, then confirm it's within a
+      // few pixels on screen.
+      let eezName: string | null = null;
+      if (globe.showEez && checkHover && !nearest && eezPoints && projection.invert) {
+        const geo = projection.invert([mouse.x, mouse.y]);
+        if (geo) {
+          const [glon, glat] = geo;
+          const cosLat = Math.cos((glat * Math.PI) / 180);
+          let best: EezPoint | null = null;
+          let bestD2 = Infinity;
+          for (const p of eezPoints) {
+            let dlon = p.lon - glon;
+            if (dlon > 180) dlon -= 360;
+            else if (dlon < -180) dlon += 360;
+            dlon *= cosLat;
+            const dlat = p.lat - glat;
+            const d2 = dlat * dlat + dlon * dlon;
+            if (d2 < bestD2) {
+              bestD2 = d2;
+              best = p;
+            }
+          }
+          if (best) {
+            const proj = projection([best.lon, best.lat]);
+            if (proj) {
+              const dx = proj[0] - mouse.x;
+              const dy = proj[1] - mouse.y;
+              if (dx * dx + dy * dy <= EEZ_HOVER_RADIUS * EEZ_HOVER_RADIUS) {
+                eezName = best.name;
+              }
+            }
+          }
+        }
+      }
+      if (eezName !== eezHoveredName) {
+        eezHoveredName = eezName;
+        onEezHoverRef.current?.(eezName ? { name: eezName, x: mouse.x, y: mouse.y } : null);
       }
     };
 
@@ -374,13 +528,55 @@ export function GlobeCanvas({ onHover, onSelect }: GlobeCanvasProps) {
       pressedMmsi = null;
     };
 
+    // Zoom while keeping the geographic point under the cursor fixed on screen.
+    // For an orthographic globe this means rotating the sphere so the anchor
+    // point stays put as the scale changes (a screen translate would slide the
+    // globe off the centred glow/markers). Solved exactly in 2 DOF — no roll.
+    const DEG = 180 / Math.PI;
+    const zoomAtPointer = (px: number, py: number, factor: number) => {
+      // Geo coords currently under the cursor, before the scale changes.
+      projection
+        .rotate([globe.rotationLambda, globe.rotationPhi, 0])
+        .scale(baseRadius * globe.zoom);
+      const anchor = projection.invert?.([px, py]);
+
+      globe.zoomBy(factor);
+
+      // Cursor off the globe → nothing to anchor, a plain zoom is all we can do.
+      if (!anchor) return;
+
+      const s = baseRadius * globe.zoom;
+      // Target on-screen offset from centre, in sphere-radius units, with the
+      // canvas y-axis flipped to point up (matches d3's orthographic raw).
+      const a = (px - width / 2) / s;
+      const b = (height / 2 - py) / s;
+      if (a * a + b * b > 1) return; // anchor would fall outside the disk
+
+      const lonP = anchor[0] / DEG;
+      const latP = anchor[1] / DEG;
+      const cosLatP = Math.cos(latP);
+      if (Math.abs(cosLatP) < 1e-6) return; // anchored on a pole
+      const sinL1 = a / cosLatP;
+      if (Math.abs(sinL1) > 1) return; // this latitude can't reach the cursor
+
+      // Keep the same hemisphere (front-facing) branch we're currently on.
+      const frontSign = Math.cos(lonP + globe.rotationLambda / DEG) >= 0 ? 1 : -1;
+      const xHoriz = frontSign * Math.sqrt(Math.max(0, cosLatP * cosLatP - a * a));
+      const lambda1 = Math.atan2(sinL1, xHoriz / cosLatP);
+      const zP = Math.sin(latP);
+      const front = Math.sqrt(Math.max(0, 1 - a * a - b * b));
+      const dPhi = Math.atan2(b, front) - Math.atan2(zP, xHoriz);
+
+      globe.setRotation((lambda1 - lonP) * DEG, dPhi * DEG);
+    };
+
     // --- Trackpad: two fingers zoom (one finger pans via pointer drag) ---
     // Two-finger scroll arrives as a plain wheel event; a pinch arrives as
-    // ctrl+wheel (smaller deltas). Both map to zoom.
+    // ctrl+wheel (smaller deltas). Both map to zoom, anchored at the cursor.
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const factor = event.ctrlKey ? 0.01 : 0.002;
-      globe.zoomBy(Math.exp(-event.deltaY * factor));
+      zoomAtPointer(event.offsetX, event.offsetY, Math.exp(-event.deltaY * factor));
     };
 
     canvas.style.cursor = 'grab';

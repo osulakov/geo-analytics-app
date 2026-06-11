@@ -1,21 +1,29 @@
 import { useEffect, useState } from 'react';
+import { observer } from 'mobx-react-lite';
 
 import { fetchVesselByMmsi, type StaticVesselInfo } from '../api/vessels';
+import { useStores } from '../stores/StoreContext';
 
 interface VesselModalProps {
   mmsi: string;
   onClose: () => void;
   onShowPath: (mmsi: string) => void;
-  onAddToGroup: (mmsi: string) => void;
 }
 
 function formatMetres(value: number | null): string {
   return value === null ? '—' : `${value} m`;
 }
 
-/** Modal with a vessel's static info, plus "Show full path" / "Close". */
-export function VesselModal({ mmsi, onClose, onShowPath, onAddToGroup }: VesselModalProps) {
+/** Modal with a vessel's static info, "Show full path", and group actions. */
+export const VesselModal = observer(function VesselModal({
+  mmsi,
+  onClose,
+  onShowPath,
+}: VesselModalProps) {
+  const { group } = useStores();
   const [vessel, setVessel] = useState<StaticVesselInfo | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -28,6 +36,18 @@ export function VesselModal({ mmsi, onClose, onShowPath, onAddToGroup }: VesselM
       active = false;
     };
   }, [mmsi]);
+
+  // Load groups when the group panel is opened.
+  useEffect(() => {
+    if (groupOpen) void group.loadGroups();
+  }, [groupOpen, group]);
+
+  const handleCreate = () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    void group.createGroup(name, mmsi);
+    setNewGroupName('');
+  };
 
   return (
     <div className="vessel-modal__overlay" onClick={onClose}>
@@ -90,13 +110,57 @@ export function VesselModal({ mmsi, onClose, onShowPath, onAddToGroup }: VesselM
           </button>
           <button
             type="button"
-            className="vessel-modal__group"
-            onClick={() => onAddToGroup(mmsi)}
+            className={`vessel-modal__group${groupOpen ? ' is-active' : ''}`}
+            aria-expanded={groupOpen}
+            onClick={() => setGroupOpen((value) => !value)}
           >
             Add to group
           </button>
         </div>
+
+        {groupOpen && (
+          <div className="vessel-modal__groups">
+            <div className="vessel-modal__group-create">
+              <input
+                type="text"
+                value={newGroupName}
+                placeholder="New group name"
+                onChange={(event) => setNewGroupName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleCreate();
+                }}
+              />
+              <button type="button" onClick={handleCreate} disabled={!newGroupName.trim()}>
+                Save
+              </button>
+            </div>
+
+            <div className="vessel-modal__group-list">
+              {group.groups.length === 0 ? (
+                <div className="vessel-modal__group-empty">No groups yet</div>
+              ) : (
+                group.groups.map((g) => {
+                  const inGroup = g.mmsis.includes(mmsi);
+                  return (
+                    <div key={g.id} className="vessel-modal__group-item">
+                      <span className="vessel-modal__group-name">
+                        {g.name} <span className="vessel-modal__group-count">({g.mmsis.length})</span>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={inGroup}
+                        onClick={() => void group.addMember(g.id, mmsi)}
+                      >
+                        {inGroup ? 'Added' : 'Add'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-}
+});

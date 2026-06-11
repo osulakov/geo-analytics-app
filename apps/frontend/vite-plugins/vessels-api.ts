@@ -1,8 +1,37 @@
+import type { IncomingMessage } from 'node:http';
 import type { Plugin } from 'vite';
 import pg from 'pg';
 
 // Default matches deployment_scripts/deploy_database.sh. Override with DATABASE_URL.
 const DEFAULT_DATABASE_URL = 'postgresql://geo:geo_dev_password@localhost:5432/geo_analytics';
+
+/** Read and JSON-parse a request body. */
+function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(data ? (JSON.parse(data) as Record<string, unknown>) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+interface GroupRow {
+  id: number;
+  name: string;
+  mmsis: string[] | null;
+}
+
+function mapGroup(row: GroupRow) {
+  return { id: row.id, name: row.name, mmsis: row.mmsis ?? [] };
+}
 
 const VESSEL_COLUMNS =
   'mmsi, imo, vessel_name, callsign, flag_state, vessel_type, length_m, width_m, draft_m';
@@ -42,15 +71,28 @@ export function vesselsApiPlugin(): Plugin {
     return pool;
   };
 
+  // Lazily create the vessel_groups table (groups are user-created at runtime).
+  let groupsReady: Promise<void> | null = null;
+  const ensureGroups = () => {
+    if (!groupsReady) {
+      groupsReady = getPool()
+        .query(
+          `CREATE TABLE IF NOT EXISTS vessel_groups (
+             id         SERIAL PRIMARY KEY,
+             name       TEXT NOT NULL,
+             mmsis      TEXT[] NOT NULL DEFAULT '{}',
+             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+           )`,
+        )
+        .then(() => undefined);
+    }
+    return groupsReady;
+  };
+
   return {
     name: 'vessels-api',
     configureServer(server) {
       server.middlewares.use('/api', async (req, res, next) => {
-        if (req.method !== 'GET') {
-          next();
-          return;
-        }
-
         const url = new URL(req.url ?? '/', 'http://localhost');
         const { pathname } = url;
         const json = (status: number, body: unknown) => {
@@ -58,6 +100,115 @@ export function vesselsApiPlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(body));
         };
+
+        // --- Mutations (groups) -------------------------------------------
+        if (req.method === 'POST') {
+          try {
+            if (pathname === '/groups') {
+              await ensureGroups();
+              const body = await readJsonBody(req);
+              const name = String(body.name ?? '').trim();
+              if (!name) {
+                json(400, { error: 'Group name is required' });
+                return;
+              }
+              const mmsis = body.mmsi ? [String(body.mmsi)] : [];
+              const { rows } = await getPool().query(
+                `INSERT INTO vessel_groups (name, mmsis) VALUES ($1, $2)
+                 RETURNING id, name, mmsis`,
+                [name, mmsis],
+              );
+              json(201, mapGroup(rows[0]));
+              return;
+            }
+
+            const memberMatch = pathname.match(/^\/groups\/(\d+)\/members$/);
+            if (memberMatch) {
+              await ensureGroups();
+              const body = await readJsonBody(req);
+              const mmsi = String(body.mmsi ?? '');
+              if (!mmsi) {
+                json(400, { error: 'mmsi is required' });
+                return;
+              }
+              const { rows } = await getPool().query(
+                `UPDATE vessel_groups
+                    SET mmsis = (
+                      SELECT array_agg(DISTINCT m)
+                        FROM unnest(array_append(mmsis, $2)) AS m
+                    )
+                  WHERE id = $1::int
+                  RETURNING id, name, mmsis`,
+                [memberMatch[1], mmsi],
+              );
+              if (rows.length === 0) {
+                json(404, { error: 'Group not found' });
+                return;
+              }
+              json(200, mapGroup(rows[0]));
+              return;
+            }
+
+            next();
+          } catch (error) {
+            console.error('[vessels-api] mutation failed:', error);
+            json(500, { error: 'Database write failed' });
+          }
+          return;
+        }
+
+        if (req.method === 'PUT') {
+          try {
+            const groupMatch = pathname.match(/^\/groups\/(\d+)$/);
+            if (groupMatch) {
+              await ensureGroups();
+              const body = await readJsonBody(req);
+              const mmsis = Array.isArray(body.mmsis)
+                ? (body.mmsis as unknown[]).map(String)
+                : [];
+              const { rows } = await getPool().query(
+                `UPDATE vessel_groups SET mmsis = $2 WHERE id = $1::int
+                 RETURNING id, name, mmsis`,
+                [groupMatch[1], mmsis],
+              );
+              if (rows.length === 0) {
+                json(404, { error: 'Group not found' });
+                return;
+              }
+              json(200, mapGroup(rows[0]));
+              return;
+            }
+            next();
+          } catch (error) {
+            console.error('[vessels-api] update failed:', error);
+            json(500, { error: 'Database write failed' });
+          }
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          try {
+            const groupMatch = pathname.match(/^\/groups\/(\d+)$/);
+            if (groupMatch) {
+              await ensureGroups();
+              await getPool().query('DELETE FROM vessel_groups WHERE id = $1::int', [
+                groupMatch[1],
+              ]);
+              json(200, { ok: true });
+              return;
+            }
+            next();
+          } catch (error) {
+            console.error('[vessels-api] delete failed:', error);
+            json(500, { error: 'Database delete failed' });
+          }
+          return;
+        }
+
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
 
         try {
           if (pathname === '/vessels') {
@@ -125,15 +276,27 @@ export function vesselsApiPlugin(): Plugin {
 
           const trackMatch = pathname.match(/^\/pings\/track\/(\d{1,9})$/);
           if (trackMatch) {
+            const conditions = ['mmsi = $1'];
+            const values: string[] = [trackMatch[1]];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
             const { rows } = await getPool().query(
               `SELECT ts,
                       ST_X(position::geometry) AS lon,
                       ST_Y(position::geometry) AS lat,
                       heading
                  FROM ais_pings
-                WHERE mmsi = $1
+                WHERE ${conditions.join(' AND ')}
                 ORDER BY ts`,
-              [trackMatch[1]],
+              values,
             );
             json(
               200,
@@ -144,6 +307,15 @@ export function vesselsApiPlugin(): Plugin {
                 heading: num(row.heading),
               })),
             );
+            return;
+          }
+
+          if (pathname === '/groups') {
+            await ensureGroups();
+            const { rows } = await getPool().query(
+              'SELECT id, name, mmsis FROM vessel_groups ORDER BY created_at',
+            );
+            json(200, rows.map(mapGroup));
             return;
           }
 

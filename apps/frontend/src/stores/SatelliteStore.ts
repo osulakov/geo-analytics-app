@@ -17,9 +17,15 @@ export class SatelliteStore {
   chasingOn = new Set<string>();
   /** The currently selected satellite (pulses + glows on the map). */
   selectedName: string | null = null;
+  /** Master visibility for the whole satellite layer (pings, orbits, coverage). */
+  visible = true;
 
   constructor() {
     makeAutoObservable(this);
+  }
+
+  toggleVisible(): void {
+    this.visible = !this.visible;
   }
 
   isSelected(name: string): boolean {

@@ -221,10 +221,26 @@ interface GlobeCanvasProps {
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
   /** Called (throttled, after the view settles) with the visible cap. */
-  onViewportChange?: (cap: { lon: number; lat: number; radius: number }) => void;
+  onViewportChange?: (cap: {
+    lon: number;
+    lat: number;
+    radius: number;
+    maxBucket: number;
+  }) => void;
 }
 
 const EARTH_RADIUS_M = 6_371_000;
+
+/**
+ * Zoom → vessel sampling bucket (0–100, nested). At low zoom we only load a
+ * fraction of vessels (every ~10th); zooming in reveals more, then all.
+ */
+function sampleBucket(zoom: number): number {
+  if (zoom < 2) return 10; // ~every 10th
+  if (zoom < 6) return 20; // ~every 5th
+  if (zoom < 15) return 50; // ~every 2nd
+  return 100; // all
+}
 
 /**
  * Sub-satellite longitude/latitude (degrees) for a circular orbit, from its
@@ -588,10 +604,12 @@ export function GlobeCanvas({
       // ground track and moving with it. Drawn as a planar quad from the four
       // projected corners (a spherical polygon fill is winding-sensitive and
       // can invert to cover the whole globe), skipped when on the far side.
+      // Master visibility for the whole satellite layer (eye toggle in widget).
+      const satVisible = satelliteStore.visible;
       ctx.lineWidth = 1;
       let coverageHover: SatelliteHover | null = null;
       for (const sat of satelliteStore.satellites) {
-        if (!satelliteStore.chasingOn.has(sat.name)) continue;
+        if (!satVisible || !satelliteStore.chasingOn.has(sat.name)) continue;
         const period = sat.orbitalPeriodMin ?? 0;
         const advanceDeg = period > 0 ? (360 * satClockMs) / (period * 60_000) : 0;
         const u = (sat.meanAnomalyDeg ?? 0) + advanceDeg;
@@ -637,7 +655,7 @@ export function GlobeCanvas({
       ctx.lineWidth = 1;
       ctx.strokeStyle = SATELLITE_ORBIT_COLOR;
       for (const sat of satelliteStore.satellites) {
-        if (!satelliteStore.orbitOn.has(sat.name)) continue;
+        if (!satVisible || !satelliteStore.orbitOn.has(sat.name)) continue;
         const rho = (EARTH_RADIUS_KM + (sat.altitudeKm ?? 0)) / EARTH_RADIUS_KM;
         ctx.beginPath();
         let penDown = false;
@@ -675,6 +693,7 @@ export function GlobeCanvas({
       let nearestSatHover: SatelliteHover | null = null;
       let nearestSatDist2 = SATELLITE_HOVER_RADIUS * SATELLITE_HOVER_RADIUS;
       for (const sat of satelliteStore.satellites) {
+        if (!satVisible) break;
         const rho = (EARTH_RADIUS_KM + (sat.altitudeKm ?? 0)) / EARTH_RADIUS_KM;
         const period = sat.orbitalPeriodMin ?? 0;
         const advanceDeg = period > 0 ? (360 * satClockMs) / (period * 60_000) : 0;
@@ -946,6 +965,7 @@ export function GlobeCanvas({
         lon: -globe.rotationLambda,
         lat: -globe.rotationPhi,
         radius,
+        maxBucket: sampleBucket(globe.zoom),
       });
     };
 

@@ -27,7 +27,7 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
  * Build a viewport spherical-cap condition from ?lon&lat&radius (metres),
  * appending the params to `values`. Returns null when no viewport is given.
  */
-function capCondition(url: URL, values: string[]): string | null {
+function capCondition(url: URL, values: unknown[]): string | null {
   const lon = url.searchParams.get('lon');
   const lat = url.searchParams.get('lat');
   const radius = url.searchParams.get('radius');
@@ -323,10 +323,12 @@ export function vesselsApiPlugin(): Plugin {
           }
 
           if (pathname === '/pings') {
-            // All pings within a time range + optional viewport cap. The client
-            // computes the latest-per-vessel and time-window filtering.
+            // All pings within a time range, scoped EITHER to an explicit MMSI
+            // list (group filter — full, no decimation) OR to a viewport cap
+            // with optional zoom-based vessel sampling. The client computes
+            // latest-per-vessel and time-window filtering.
             const conditions: string[] = [];
-            const values: string[] = [];
+            const values: unknown[] = [];
             const from = url.searchParams.get('from');
             const to = url.searchParams.get('to');
             if (from) {
@@ -337,8 +339,23 @@ export function vesselsApiPlugin(): Plugin {
               values.push(to);
               conditions.push(`ts <= $${values.length}`);
             }
-            const cap = capCondition(url, values);
-            if (cap) conditions.push(cap);
+
+            const mmsisParam = url.searchParams.get('mmsis');
+            if (mmsisParam) {
+              const mmsis = mmsisParam.split(',').filter(Boolean);
+              values.push(mmsis);
+              conditions.push(`mmsi = ANY($${values.length}::text[])`);
+            } else {
+              const cap = capCondition(url, values);
+              if (cap) conditions.push(cap);
+              // Nested deterministic sampling: keep vessels whose stable bucket
+              // (0–99) is below the zoom threshold.
+              const bucket = url.searchParams.get('bucket');
+              if (bucket !== null) {
+                values.push(bucket);
+                conditions.push(`(abs(hashtext(mmsi)) % 100) < $${values.length}::int`);
+              }
+            }
             const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
             const { rows } = await getPool().query(

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { observer } from "mobx-react-lite";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
 
 import { useStores } from "../stores/StoreContext";
 import { colorForMmsi } from "../layers_controller/colorMap";
@@ -62,6 +63,14 @@ export const VesselsWidget = observer(function VesselsWidget() {
     } else {
       // Glow every member's recent ping and load all their tracks (date-ranged).
       void ping.showGroup(g.id, g.mmsis);
+    }
+  };
+
+  const toggleFilterGroup = (g: VesselGroup) => {
+    if (ping.filteredGroupId === g.id) {
+      ping.clearFilter();
+    } else {
+      ping.setFilter(g.id, g.mmsis);
     }
   };
 
@@ -231,16 +240,8 @@ export const VesselsWidget = observer(function VesselsWidget() {
                     className={`group-row__icon${
                       ping.shownGroupId === g.id ? " is-shown" : ""
                     }`}
-                    title={
-                      ping.shownGroupId === g.id
-                        ? "Hide from map"
-                        : "Show on map"
-                    }
-                    aria-label={
-                      ping.shownGroupId === g.id
-                        ? "Hide from map"
-                        : "Show on map"
-                    }
+                    title="Show all path"
+                    aria-label="Show all path"
                     aria-pressed={ping.shownGroupId === g.id}
                     onClick={() => toggleShowGroup(g)}
                   >
@@ -255,9 +256,29 @@ export const VesselsWidget = observer(function VesselsWidget() {
                       strokeLinejoin="round"
                       aria-hidden="true"
                     >
-                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
+                      <polyline points="5 17 12 10 19 5" />
+                      <circle cx="5" cy="17" r="2" fill="currentColor" stroke="none" />
+                      <circle cx="12" cy="10" r="2" fill="currentColor" stroke="none" />
+                      <circle cx="19" cy="5" r="2" fill="currentColor" stroke="none" />
                     </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className={`group-row__icon${
+                      ping.filteredGroupId === g.id ? ' is-shown' : ''
+                    }`}
+                    title={
+                      ping.filteredGroupId === g.id
+                        ? 'Clear filter (show all vessels)'
+                        : 'Filter map to this group only'
+                    }
+                    aria-label={
+                      ping.filteredGroupId === g.id ? 'Clear filter' : 'Filter to group'
+                    }
+                    aria-pressed={ping.filteredGroupId === g.id}
+                    onClick={() => toggleFilterGroup(g)}
+                  >
+                    <FilterAltIcon sx={{ fontSize: 14 }} />
                   </button>
                   <button
                     type="button"

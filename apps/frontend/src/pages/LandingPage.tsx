@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
 import { DateRangeWidget } from '../components/DateRangeWidget';
+import { EventCounter } from '../components/EventCounter';
 import { EezTooltip } from '../layers_controller/EezTooltip';
 import { EventTooltip } from '../layers_controller/EventTooltip';
 import {
@@ -40,7 +41,12 @@ export function LandingPage() {
   }, [stores]);
 
   // Reload pings + events for the visible cap whenever the view settles.
-  const handleViewport = (cap: { lon: number; lat: number; radius: number }) => {
+  const handleViewport = (cap: {
+    lon: number;
+    lat: number;
+    radius: number;
+    maxBucket: number;
+  }) => {
     stores.ping.setViewport(cap);
     void stores.event.loadGeofence(stores.ping.rangeStartIso, stores.ping.rangeEndIso, cap);
   };
@@ -88,10 +94,12 @@ export function LandingPage() {
       />
       <GlobeControls />
       <TimeSlider />
+      <ChatWidget />
       <div className="right-stack">
         <div className="right-stack__counters">
           <ShipCounter />
           <SatelliteCounter />
+          <EventCounter />
         </div>
         <SatellitesWidget />
       </div>
@@ -100,7 +108,6 @@ export function LandingPage() {
         <DateRangeWidget />
         <VesselsWidget />
         <LayersWidget />
-        <ChatWidget />
       </div>
       {satHover && !selected && (
         <SatelliteTooltip

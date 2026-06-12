@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import AnimationIcon from '@mui/icons-material/Animation';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 import { useStores } from '../stores/StoreContext';
 import type { Satellite } from '../data_loaders/satellites';
@@ -148,6 +150,20 @@ export const SatellitesWidget = observer(function SatellitesWidget() {
           onClick={() => satellite.toggleAllOrbits()}
         >
           <AnimationIcon fontSize="inherit" />
+        </button>
+        <button
+          type="button"
+          className={`satellite-row__icon${satellite.visible ? ' is-active' : ''}`}
+          title={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+          aria-label={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+          aria-pressed={satellite.visible}
+          onClick={() => satellite.toggleVisible()}
+        >
+          {satellite.visible ? (
+            <VisibilityIcon fontSize="inherit" />
+          ) : (
+            <VisibilityOffIcon fontSize="inherit" />
+          )}
         </button>
         <button
           type="button"

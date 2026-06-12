@@ -322,6 +322,49 @@ export function vesselsApiPlugin(): Plugin {
             return;
           }
 
+          const latestMmsiMatch = pathname.match(/^\/pings\/latest\/(\d{1,9})$/);
+          if (latestMmsiMatch) {
+            // Most recent ping for a single vessel (within an optional range).
+            // Used to pin/fly-to a vessel even when it's outside the loaded
+            // viewport sample. Returns the ping object, or null if none.
+            const conditions = ['mmsi = $1'];
+            const values: string[] = [latestMmsiMatch[1]];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
+            const { rows } = await getPool().query(
+              `SELECT mmsi, ts,
+                      ST_X(position::geometry) AS lon,
+                      ST_Y(position::geometry) AS lat,
+                      heading
+                 FROM ais_pings
+                WHERE ${conditions.join(' AND ')}
+                ORDER BY ts DESC
+                LIMIT 1`,
+              values,
+            );
+            json(
+              200,
+              rows.length === 0
+                ? null
+                : {
+                    mmsi: rows[0].mmsi,
+                    ts: rows[0].ts,
+                    lon: Number(rows[0].lon),
+                    lat: Number(rows[0].lat),
+                    heading: num(rows[0].heading),
+                  },
+            );
+            return;
+          }
+
           if (pathname === '/pings') {
             // All pings within a time range, scoped EITHER to an explicit MMSI
             // list (group filter — full, no decimation) OR to a viewport cap

@@ -42,9 +42,11 @@ export const VesselsWidget = observer(function VesselsWidget() {
   const [pendingDelete, setPendingDelete] = useState<VesselGroup | null>(null);
 
   const handleVesselClick = (mmsi: string) => {
-    ping.setHighlight(mmsi);
-    const latest = ping.pings.find((p) => p.mmsi === mmsi);
-    if (latest) globe.flyTo(latest.lon, latest.lat);
+    // Fetch this vessel's recent ping directly (it may not be in the paginated
+    // viewport sample), merge + pulse it, then fly to it once located.
+    void ping.focusVessel(mmsi).then((latest) => {
+      if (latest) globe.flyTo(latest.lon, latest.lat);
+    });
   };
 
   const isPathShown = (mmsi: string) =>

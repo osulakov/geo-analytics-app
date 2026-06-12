@@ -2,6 +2,7 @@ import { makeAutoObservable, observable, runInAction } from 'mobx';
 
 import {
   fetchAllPings,
+  fetchLatestPing,
   fetchVesselTrack,
   type LatestPing,
   type TrackPoint,
@@ -91,6 +92,11 @@ export class PingStore {
   // Vessels whose latest ping pulses (single selection or a whole group).
   highlightMmsis: string[] = [];
 
+  // A vessel pinned by an explicit click in the widget: its recent ping is
+  // fetched on demand and always merged into the display, so it shows even when
+  // it falls outside the current viewport sample / pagination.
+  focusedPing: TimedPing | null = null;
+
   // Group currently shown on the map (its eye toggle is "on"), if any.
   shownGroupId: number | null = null;
 
@@ -144,7 +150,36 @@ export class PingStore {
     };
     consider(this.basePings);
     consider(this.allPings); // detail overrides base for shared vessels
+    // A focused (explicitly clicked) vessel is always merged in, so it shows
+    // even when outside the viewport sample.
+    const fp = this.focusedPing;
+    if (fp && fp.tMs >= start && fp.tMs <= end && (!allow || allow.has(fp.mmsi))) {
+      latest.set(fp.mmsi, fp);
+    }
     this.pings = Array.from(latest.values());
+  }
+
+  /**
+   * Pin a vessel clicked in the widget: fetch its most recent ping (an extra
+   * API call, independent of the paginated viewport load), merge it into the
+   * display, highlight it (pulse), and return it so the caller can fly to it.
+   * Falls back to any already-loaded ping if the fetch yields nothing.
+   */
+  async focusVessel(mmsi: string): Promise<LatestPing | null> {
+    this.setHighlight(mmsi);
+    try {
+      const ping = await fetchLatestPing(mmsi, this.rangeStartIso, this.rangeEndIso);
+      if (ping) {
+        runInAction(() => {
+          this.focusedPing = { ...ping, tMs: Date.parse(ping.ts) };
+          this.recompute();
+        });
+        return ping;
+      }
+    } catch (error) {
+      console.error(`Failed to fetch latest ping for ${mmsi}:`, error);
+    }
+    return this.pings.find((p) => p.mmsi === mmsi) ?? null;
   }
 
   /** Show only this group's vessels on the map (hide all others). Reloads so

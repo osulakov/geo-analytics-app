@@ -50,6 +50,25 @@ export async function fetchVesselTrack(
   return (await response.json()) as TrackPoint[];
 }
 
+/** Fetch the single most recent ping for one vessel (null if none in range). */
+export async function fetchLatestPing(
+  mmsi: string,
+  fromIso?: string,
+  toIso?: string,
+  signal?: AbortSignal,
+): Promise<LatestPing | null> {
+  const params = new URLSearchParams();
+  if (fromIso) params.set('from', fromIso);
+  if (toIso) params.set('to', toIso);
+  const query = params.toString();
+
+  const response = await fetch(`/api/pings/latest/${mmsi}${query ? `?${query}` : ''}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch latest ping for ${mmsi}: ${response.status}`);
+  }
+  return (await response.json()) as LatestPing | null;
+}
+
 export interface PingQuery {
   fromIso?: string;
   toIso?: string;

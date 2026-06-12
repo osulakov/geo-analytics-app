@@ -3,6 +3,14 @@ import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
 
+const COMMON_CASES = [
+  'Give me all vessels that cross EEZ in Strait of Hormuz',
+  'Show vessels idle in the Gulf of Oman for over 24h',
+  'Which vessels entered the Suez Canal this week?',
+  'List tankers near the Bab-el-Mandeb strait',
+  'Find vessels with AIS gaps in the Mediterranean',
+];
+
 /**
  * Top-left AI messenger panel. Collapsed to just an input field by default;
  * expands on the chevron or when the first message is sent.
@@ -26,16 +34,6 @@ export const ChatWidget = observer(function ChatWidget() {
 
   return (
     <aside className={`chat-widget${chat.expanded ? '' : ' is-collapsed'}`}>
-      {chat.expanded && (
-        <div className="chat-widget__messages" ref={listRef}>
-          {chat.messages.map((message) => (
-            <div key={message.id} className={`chat-message chat-message--${message.role}`}>
-              {message.text}
-            </div>
-          ))}
-        </div>
-      )}
-
       <form className="chat-widget__input" onSubmit={handleSubmit}>
         <button
           type="button"
@@ -72,6 +70,30 @@ export const ChatWidget = observer(function ChatWidget() {
           </svg>
         </button>
       </form>
+
+      <div className="chat-widget__body" aria-hidden={!chat.expanded}>
+        <div className="chat-widget__messages" ref={listRef}>
+          {chat.messages.map((message) => (
+            <div key={message.id} className={`chat-message chat-message--${message.role}`}>
+              {message.text}
+            </div>
+          ))}
+        </div>
+
+        <div className="chat-widget__cases">
+          <div className="chat-widget__cases-title">Common cases:</div>
+          {COMMON_CASES.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="chat-case"
+              onClick={() => setDraft(prompt)}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      </div>
     </aside>
   );
 });

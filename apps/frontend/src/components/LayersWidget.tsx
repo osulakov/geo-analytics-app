@@ -1,6 +1,13 @@
 import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
+import squareIcon from '../assets/analytics_square.svg?raw';
+import triangleIcon from '../assets/analytics_triangle.svg?raw';
+
+// Legend colors: device tracks → yellow triangle, geofence → red square
+// (matching the red geofence marker on the map).
+const DEVICE_TRACKS_COLOR = '#facc15';
+const GEOFENCE_COLOR = '#ef4444';
 
 interface ToggleProps {
   on: boolean;
@@ -20,6 +27,18 @@ function Toggle({ on, onChange, label }: ToggleProps) {
     >
       <span className="box-checkbox__fill" />
     </button>
+  );
+}
+
+/** Colored layer legend icon (recolors the SVG's currentColor stroke via CSS). */
+function LayerIcon({ svg, color }: { svg: string; color: string }) {
+  return (
+    <span
+      className="layer__icon"
+      style={{ color }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 
@@ -53,6 +72,7 @@ export const LayersWidget = observer(function LayersWidget() {
             >
               <polyline points="9 18 15 12 9 6" />
             </svg>
+            <LayerIcon svg={triangleIcon} color={DEVICE_TRACKS_COLOR} />
             <span className="layer__name">Device tracks</span>
           </button>
           <Toggle
@@ -78,7 +98,10 @@ export const LayersWidget = observer(function LayersWidget() {
 
       <div className="layer">
         <div className="layer__header">
-          <span className="layer__name layer__name--leaf">Geofence (Enter/Exit)</span>
+          <span className="layer__leaf">
+            <LayerIcon svg={squareIcon} color={GEOFENCE_COLOR} />
+            <span className="layer__name">Geofence (Enter/Exit)</span>
+          </span>
           <Toggle
             on={layers.geofenceVisible}
             onChange={() => layers.toggleGeofence()}

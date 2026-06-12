@@ -38,6 +38,7 @@ export function LandingPage() {
     stores.vessel.load();
     stores.satellite.load();
     stores.group.loadGroups();
+    void stores.ping.loadActiveCount();
   }, [stores]);
 
   // Reload pings + events for the visible cap whenever the view settles.

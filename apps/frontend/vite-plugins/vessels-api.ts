@@ -365,6 +365,30 @@ export function vesselsApiPlugin(): Plugin {
             return;
           }
 
+          if (pathname === '/pings/count') {
+            // Count of distinct vessels (MMSIs) that have any ping within the
+            // given date range. Used by the top counter; not viewport-scoped.
+            const conditions: string[] = [];
+            const values: string[] = [];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
+            const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+            const { rows } = await getPool().query(
+              `SELECT count(DISTINCT mmsi)::int AS count FROM ais_pings ${where}`,
+              values,
+            );
+            json(200, { count: rows[0].count });
+            return;
+          }
+
           if (pathname === '/pings') {
             // All pings within a time range, scoped EITHER to an explicit MMSI
             // list (group filter — full, no decimation) OR to a viewport cap

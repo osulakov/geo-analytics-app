@@ -69,6 +69,25 @@ export async function fetchLatestPing(
   return (await response.json()) as LatestPing | null;
 }
 
+/** Count of distinct vessels with any ping in the given date range. */
+export async function fetchActiveVesselCount(
+  fromIso?: string,
+  toIso?: string,
+  signal?: AbortSignal,
+): Promise<number> {
+  const params = new URLSearchParams();
+  if (fromIso) params.set('from', fromIso);
+  if (toIso) params.set('to', toIso);
+  const query = params.toString();
+
+  const response = await fetch(`/api/pings/count${query ? `?${query}` : ''}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch vessel count: ${response.status}`);
+  }
+  const data = (await response.json()) as { count: number };
+  return data.count;
+}
+
 export interface PingQuery {
   fromIso?: string;
   toIso?: string;

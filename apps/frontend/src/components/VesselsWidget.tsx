@@ -49,31 +49,39 @@ export const VesselsWidget = observer(function VesselsWidget() {
     });
   };
 
-  const isPathShown = (mmsi: string) =>
-    ping.tracks.length === 1 && ping.tracks[0].mmsi === mmsi;
+  const isPathShown = (mmsi: string) => ping.isTrackShown(mmsi);
 
   const togglePath = (mmsi: string) => {
-    // Clicking the path button also selects the vessel (glow + fly-to).
+    // Clicking the path button also selects the vessel (glow + fly-to), and
+    // toggles its path in the multi-select set (union of all shown paths).
     handleVesselClick(mmsi);
-    if (isPathShown(mmsi)) ping.clearTracks();
-    else void ping.showTrack(mmsi);
+    ping.toggleTrack(mmsi);
   };
 
   const toggleShowGroup = (g: VesselGroup) => {
-    if (ping.shownGroupId === g.id) {
-      ping.hideGroup();
-    } else {
-      // Glow every member's recent ping and load all their tracks (date-ranged).
-      void ping.showGroup(g.id, g.mmsis);
-    }
+    // Multi-select: toggle this group in/out, then show the union of all
+    // selected groups' tracks (so showing one no longer hides another).
+    const ids = ping.shownGroupIds.includes(g.id)
+      ? ping.shownGroupIds.filter((id) => id !== g.id)
+      : [...ping.shownGroupIds, g.id];
+    const selected = new Set(ids);
+    const mmsis = [
+      ...new Set(group.groups.filter((x) => selected.has(x.id)).flatMap((x) => x.mmsis)),
+    ];
+    ping.setShownGroups(ids, mmsis);
   };
 
   const toggleFilterGroup = (g: VesselGroup) => {
-    if (ping.filteredGroupId === g.id) {
-      ping.clearFilter();
-    } else {
-      ping.setFilter(g.id, g.mmsis);
-    }
+    // Multi-select: toggle this group in/out, then filter to the union of all
+    // selected groups' vessels.
+    const ids = ping.filteredGroupIds.includes(g.id)
+      ? ping.filteredGroupIds.filter((id) => id !== g.id)
+      : [...ping.filteredGroupIds, g.id];
+    const selected = new Set(ids);
+    const mmsis = [
+      ...new Set(group.groups.filter((x) => selected.has(x.id)).flatMap((x) => x.mmsis)),
+    ];
+    ping.setFilter(ids, mmsis);
   };
 
   const confirmDelete = () => {
@@ -240,11 +248,11 @@ export const VesselsWidget = observer(function VesselsWidget() {
                   <button
                     type="button"
                     className={`group-row__icon${
-                      ping.shownGroupId === g.id ? " is-shown" : ""
+                      ping.isGroupShown(g.id) ? " is-shown" : ""
                     }`}
                     title="Show all path"
                     aria-label="Show all path"
-                    aria-pressed={ping.shownGroupId === g.id}
+                    aria-pressed={ping.isGroupShown(g.id)}
                     onClick={() => toggleShowGroup(g)}
                   >
                     <svg
@@ -267,17 +275,17 @@ export const VesselsWidget = observer(function VesselsWidget() {
                   <button
                     type="button"
                     className={`group-row__icon${
-                      ping.filteredGroupId === g.id ? ' is-shown' : ''
+                      ping.filteredGroupIds.includes(g.id) ? ' is-shown' : ''
                     }`}
                     title={
-                      ping.filteredGroupId === g.id
-                        ? 'Clear filter (show all vessels)'
-                        : 'Filter map to this group only'
+                      ping.filteredGroupIds.includes(g.id)
+                        ? 'Remove this group from the filter'
+                        : 'Filter map to this group'
                     }
                     aria-label={
-                      ping.filteredGroupId === g.id ? 'Clear filter' : 'Filter to group'
+                      ping.filteredGroupIds.includes(g.id) ? 'Remove from filter' : 'Filter to group'
                     }
-                    aria-pressed={ping.filteredGroupId === g.id}
+                    aria-pressed={ping.filteredGroupIds.includes(g.id)}
                     onClick={() => toggleFilterGroup(g)}
                   >
                     <FilterAltIcon sx={{ fontSize: 14 }} />

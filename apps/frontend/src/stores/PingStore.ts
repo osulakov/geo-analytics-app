@@ -1,6 +1,7 @@
 import { makeAutoObservable, observable, runInAction } from 'mobx';
 
 import {
+  fetchActiveVesselCount,
   fetchAllPings,
   fetchLatestPing,
   fetchVesselTrack,
@@ -67,6 +68,10 @@ export class PingStore {
   pings: LatestPing[] = [];
   loaded = false;
 
+  // Count of distinct vessels with any ping in the global date range (shown in
+  // the top counter). Independent of the viewport and the time-slider window.
+  activeVesselCount = 0;
+
   // Global date range (slider bounds). Defaults to the seeded two-week window.
   fromDate: string;
   toDate: string;
@@ -80,6 +85,9 @@ export class PingStore {
 
   // Loaded vessel tracks (one from the modal, or many from a group).
   tracks: VesselTrack[] = [];
+  // Vessels whose individual path is toggled on (multi-select); the rendered
+  // `tracks` is the union of these.
+  shownTrackMmsis: string[] = [];
 
   // In-flight request controllers, so a newer request supersedes an older one.
   loadController: AbortController | null = null;
@@ -97,12 +105,15 @@ export class PingStore {
   // it falls outside the current viewport sample / pagination.
   focusedPing: TimedPing | null = null;
 
-  // Group currently shown on the map (its eye toggle is "on"), if any.
-  shownGroupId: number | null = null;
+  // Groups currently shown on the map (eye toggle on); multi-select. The
+  // rendered tracks are the union of these groups' members + shownTrackMmsis.
+  shownGroupIds: number[] = [];
+  shownGroupMmsis: string[] = [];
 
-  // When set, the map shows ONLY these vessels (group filter); null = all.
+  // When set, the map shows ONLY these vessels (union of the filtered groups);
+  // null = all. filteredGroupIds drives the per-group toggle state.
   filterMmsis: string[] | null = null;
-  filteredGroupId: number | null = null;
+  filteredGroupIds: number[] = [];
 
   constructor() {
     const today = new Date();
@@ -182,19 +193,18 @@ export class PingStore {
     return this.pings.find((p) => p.mmsi === mmsi) ?? null;
   }
 
-  /** Show only this group's vessels on the map (hide all others). Reloads so
-   *  every group member is fetched in full (no viewport cap, no decimation). */
-  setFilter(groupId: number, mmsis: string[]): void {
-    this.filteredGroupId = groupId;
-    this.filterMmsis = mmsis;
+  /** Show only the given groups' vessels (union) on the map; empty = show all.
+   *  `mmsis` is the deduped union of the selected groups' members. Reloads so
+   *  every member is fetched in full (no viewport cap, no decimation). */
+  setFilter(groupIds: number[], mmsis: string[]): void {
+    this.filteredGroupIds = groupIds;
+    this.filterMmsis = groupIds.length > 0 ? mmsis : null;
     void this.loadDetail();
   }
 
   /** Clear the group filter (back to viewport + zoom-decimated loading). */
   clearFilter(): void {
-    this.filteredGroupId = null;
-    this.filterMmsis = null;
-    void this.loadDetail();
+    this.setFilter([], []);
   }
 
   /** Set the viewport (pan/zoom). Always reloads the detail layer; reloads the
@@ -219,7 +229,20 @@ export class PingStore {
     this.windowEnd = dayEndIso(toDate);
     void this.loadDetail();
     void this.loadBase();
-    this.reloadTracks();
+    void this.loadActiveCount();
+    this.rebuildTracks();
+  }
+
+  /** Load the count of distinct vessels with pings in the global date range. */
+  async loadActiveCount(): Promise<void> {
+    try {
+      const count = await fetchActiveVesselCount(this.rangeStartIso, this.rangeEndIso);
+      runInAction(() => {
+        this.activeVesselCount = count;
+      });
+    } catch (error) {
+      console.error('Failed to load active vessel count:', error);
+    }
   }
 
   /** Narrow/widen the active time window (slider) — client-side only, no fetch. */
@@ -229,30 +252,58 @@ export class PingStore {
     this.recompute();
   }
 
-  /** Re-fetch any currently-shown tracks for the global range. */
-  private reloadTracks(): void {
-    if (this.tracks.length > 0) {
-      void this.showTracks(this.tracks.map((t) => t.mmsi));
+  /** The set of vessels whose tracks should be drawn: individually-shown
+   *  vessels ∪ all shown groups' members. */
+  private trackUnion(): string[] {
+    return [...new Set([...this.shownTrackMmsis, ...this.shownGroupMmsis])];
+  }
+
+  /** Re-fetch the current track union (individual + groups) for the range. */
+  private rebuildTracks(): void {
+    const union = this.trackUnion();
+    if (union.length > 0) {
+      void this.showTracks(union);
+    } else {
+      this.tracksController?.abort();
+      this.tracksController = null;
+      this.tracks = [];
     }
   }
 
-  /** Load and show the full path for a single vessel. */
+  /** Add a vessel's path to the shown set (used by the modal "Show full path"). */
   async showTrack(mmsi: string): Promise<void> {
-    this.shownGroupId = null;
-    await this.showTracks([mmsi]);
+    if (!this.shownTrackMmsis.includes(mmsi)) {
+      this.shownTrackMmsis = [...this.shownTrackMmsis, mmsi];
+    }
+    this.rebuildTracks();
   }
 
-  /** Show a whole group: glow every member and load all their tracks. */
-  async showGroup(groupId: number, mmsis: string[]): Promise<void> {
-    this.shownGroupId = groupId;
-    this.highlightMmsis = mmsis;
-    await this.showTracks(mmsis);
+  /** Toggle a vessel's path on/off (multi-select); shows the union of all. */
+  toggleTrack(mmsi: string): void {
+    this.shownTrackMmsis = this.shownTrackMmsis.includes(mmsi)
+      ? this.shownTrackMmsis.filter((m) => m !== mmsi)
+      : [...this.shownTrackMmsis, mmsi];
+    this.rebuildTracks();
   }
 
-  /** Hide the shown group (clears its glow and tracks). */
-  hideGroup(): void {
-    this.highlightMmsis = [];
-    this.clearTracks();
+  /** Whether a vessel's path is currently shown. */
+  isTrackShown(mmsi: string): boolean {
+    return this.shownTrackMmsis.includes(mmsi);
+  }
+
+  /** Show the given groups (multi-select): glow their members and draw the
+   *  union of all shown groups' + individual tracks. `mmsis` is the deduped
+   *  union of the selected groups' members; empty groupIds = none shown. */
+  setShownGroups(groupIds: number[], mmsis: string[]): void {
+    this.shownGroupIds = groupIds;
+    this.shownGroupMmsis = groupIds.length > 0 ? mmsis : [];
+    this.highlightMmsis = this.shownGroupMmsis;
+    this.rebuildTracks();
+  }
+
+  /** Whether a group's paths are currently shown. */
+  isGroupShown(groupId: number): boolean {
+    return this.shownGroupIds.includes(groupId);
   }
 
   /** Load full paths (global range) for several vessels; window filtering is
@@ -282,12 +333,13 @@ export class PingStore {
     this.tracksController?.abort();
     this.tracksController = null;
     this.tracks = [];
-    this.shownGroupId = null;
+    this.shownGroupIds = [];
+    this.shownGroupMmsis = [];
+    this.shownTrackMmsis = [];
   }
 
   setHighlight(mmsi: string | null): void {
     this.highlightMmsis = mmsi ? [mmsi] : [];
-    this.shownGroupId = null;
   }
 
   setHighlightMany(mmsis: string[]): void {

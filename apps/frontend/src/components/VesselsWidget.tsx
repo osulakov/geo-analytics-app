@@ -5,7 +5,7 @@ import { observer } from "mobx-react-lite";
 import { useStores } from "../stores/StoreContext";
 import { colorForMmsi } from "../layers_controller/colorMap";
 import { GroupEditModal } from "./GroupEditModal";
-import type { StaticVesselInfo } from "../data_loaders/]";
+import type { StaticVesselInfo } from "../data_loaders/vessels";
 import type { VesselGroup } from "../data_loaders/groups";
 
 const PAGE_SIZE = 5;

@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
 import { DateRangeWidget } from '../components/DateRangeWidget';
-import { EventTooltip } from '../components/EventTooltip';
+import { EezTooltip } from '../layers_controller/EezTooltip';
+import { EventTooltip } from '../layers_controller/EventTooltip';
 import {
   GlobeCanvas,
   type EezHover,
@@ -14,13 +15,13 @@ import {
 import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
-import { SatelliteTooltip } from '../components/SatelliteTooltip';
+import { SatelliteTooltip } from '../layers_controller/SatelliteTooltip';
 import { SatellitesWidget } from '../components/SatellitesWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
 import { VesselModal } from '../components/VesselModal';
 import { VesselsWidget } from '../components/VesselsWidget';
-import { VesselTooltip } from '../components/VesselTooltip';
+import { VesselTooltip } from '../layers_controller/VesselTooltip';
 import { useStores } from '../stores/StoreContext';
 
 export function LandingPage() {
@@ -122,9 +123,7 @@ export function LandingPage() {
         <EventTooltip event={eventHover.event} x={eventHover.x} y={eventHover.y} />
       )}
       {eezHover && !satHover && !hover && !eventHover && !selected && (
-        <div className="eez-tooltip" style={{ left: eezHover.x + 14, top: eezHover.y + 14 }}>
-          {eezHover.name}
-        </div>
+        <EezTooltip name={eezHover.name} x={eezHover.x} y={eezHover.y} />
       )}
       {selected && (
         <VesselModal mmsi={selected} onClose={handleClose} onShowPath={handleShowPath} />

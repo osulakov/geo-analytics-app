@@ -319,6 +319,52 @@ export function vesselsApiPlugin(): Plugin {
             return;
           }
 
+          if (pathname === '/events/geofence') {
+            // The events table is produced by analyses_scripts; return [] if it
+            // hasn't been created yet.
+            const reg = await getPool().query("SELECT to_regclass('public.events') AS t");
+            if (!reg.rows[0].t) {
+              json(200, []);
+              return;
+            }
+
+            const conditions = ["event_type = 'geofence_enter_exit'"];
+            const values: string[] = [];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
+
+            const { rows } = await getPool().query(
+              `SELECT mmsi, event_type, subtype, ts, details,
+                      ST_X(position::geometry) AS lon,
+                      ST_Y(position::geometry) AS lat
+                 FROM events
+                WHERE ${conditions.join(' AND ')}
+                ORDER BY ts`,
+              values,
+            );
+            json(
+              200,
+              rows.map((row) => ({
+                mmsi: row.mmsi,
+                eventType: row.event_type,
+                subtype: row.subtype,
+                ts: row.ts,
+                lon: Number(row.lon),
+                lat: Number(row.lat),
+                details: row.details ?? null,
+              })),
+            );
+            return;
+          }
+
           next();
         } catch (error) {
           console.error('[vessels-api] query failed:', error);

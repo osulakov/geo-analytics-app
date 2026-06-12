@@ -9,8 +9,22 @@ import countries110m from 'world-atlas/countries-110m.json';
 // so it can be re-projected every frame without tanking the frame rate.
 // Resolved to a static URL and fetched lazily the first time the layer is on.
 import eezUrl from '../assets/eez-simplified.geojson?url';
+import analyticsSquareRaw from '../assets/analytics_square.svg?raw';
 import { useStores } from '../stores/StoreContext';
 import { colorForMmsi, colorForMmsiAlpha } from '../utils/colorMap';
+import type { MapEvent } from '../api/events';
+
+// Red geofence-event icon (the square SVG, recolored), drawn on the canvas.
+const GEOFENCE_COLOR = '#ef4444';
+const GEOFENCE_ICON_SIZE = 16;
+const geofenceIcon = new Image();
+let geofenceIconReady = false;
+geofenceIcon.onload = () => {
+  geofenceIconReady = true;
+};
+geofenceIcon.src =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(analyticsSquareRaw.replace(/currentColor/g, GEOFENCE_COLOR));
 
 // Pre-compute the geometry once at module load — it never changes.
 const topology = countries110m as unknown as Topology;
@@ -121,13 +135,17 @@ const COLORS = {
 const DRAG_SENSITIVITY = 0.3;
 
 // Marker radius in CSS pixels — fixed on screen regardless of globe zoom.
-const MARKER_RADIUS = 5;
+const MARKER_RADIUS = 2;
 
 // Ping marker radius and the pixel distance within which a ping is "hovered".
-const PING_RADIUS = 2.5;
+const PING_RADIUS = 1;
+// Latest ("recent") vessel pings are drawn larger than historical track points.
+const RECENT_PING_RADIUS = 2;
 const HOVER_RADIUS = 8;
 // Pixel tolerance for hovering an EEZ line.
 const EEZ_HOVER_RADIUS = 8;
+// Pixel tolerance for hovering an event marker.
+const EVENT_HOVER_RADIUS = 11;
 
 /** A ping currently under the cursor, with its on-screen position. */
 export interface PingHover {
@@ -145,11 +163,20 @@ export interface EezHover {
   y: number;
 }
 
+/** A map event under the cursor. */
+export interface EventHover {
+  event: MapEvent;
+  x: number;
+  y: number;
+}
+
 interface GlobeCanvasProps {
   /** Called when the hovered ping changes (null when nothing is hovered). */
   onHover?: (hover: PingHover | null) => void;
   /** Called when the hovered EEZ boundary changes. */
   onEezHover?: (hover: EezHover | null) => void;
+  /** Called when the hovered event marker changes. */
+  onEventHover?: (hover: EventHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
 }
@@ -164,7 +191,7 @@ const markers: Feature<Point>[] = [
   },
 ];
 
-export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps) {
+export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: GlobeCanvasProps) {
   const stores = useStores();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -174,6 +201,8 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
   onHoverRef.current = onHover;
   const onEezHoverRef = useRef(onEezHover);
   onEezHoverRef.current = onEezHover;
+  const onEventHoverRef = useRef(onEventHover);
+  onEventHoverRef.current = onEventHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -187,6 +216,8 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
 
     const globe = stores.globe;
     const pingStore = stores.ping;
+    const layerStore = stores.layers;
+    const eventStore = stores.event;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
@@ -202,6 +233,8 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
     let hoveredKey: string | null = null;
     // Name of the hovered EEZ boundary (for change detection).
     let eezHoveredName: string | null = null;
+    // Identity of the hovered event marker (for change detection).
+    let eventHoveredKey: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -311,17 +344,46 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
       let nearest: PingHover | null = null;
       let nearestDist2 = HOVER_RADIUS * HOVER_RADIUS;
 
-      // Loaded vessel tracks, drawn as individual pings (no lines).
-      for (const tr of pingStore.tracks) {
-        ctx.fillStyle = colorForMmsi(tr.mmsi);
-        for (const point of tr.points) {
-          const coordinates: [number, number] = [point.lon, point.lat];
+      // Loaded vessel tracks, drawn as individual pings (no lines). Part of the
+      // Device-tracks layer.
+      if (layerStore.deviceTracksVisible) {
+        for (const tr of pingStore.tracks) {
+          ctx.fillStyle = colorForMmsi(tr.mmsi);
+          for (const point of tr.points) {
+            const coordinates: [number, number] = [point.lon, point.lat];
+            if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+            const projected = projection(coordinates);
+            if (!projected) continue;
+            const [x, y] = projected;
+            ctx.beginPath();
+            ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
+            ctx.fill();
+
+            if (checkHover) {
+              const dx = x - mouse.x;
+              const dy = y - mouse.y;
+              const dist2 = dx * dx + dy * dy;
+              if (dist2 < nearestDist2) {
+                nearestDist2 = dist2;
+                nearest = { mmsi: tr.mmsi, x, y, ts: point.ts, heading: point.heading };
+              }
+            }
+          }
+        }
+      }
+
+      // Latest vessel pings (the "pings" sublayer of Device tracks).
+      if (layerStore.pingsActive) {
+        for (const ping of pingStore.pings) {
+          const coordinates: [number, number] = [ping.lon, ping.lat];
           if (geoDistance(coordinates, center) > Math.PI / 2) continue;
           const projected = projection(coordinates);
           if (!projected) continue;
           const [x, y] = projected;
+
           ctx.beginPath();
-          ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
+          ctx.arc(x, y, RECENT_PING_RADIUS, 0, 2 * Math.PI);
+          ctx.fillStyle = colorForMmsi(ping.mmsi);
           ctx.fill();
 
           if (checkHover) {
@@ -330,32 +392,8 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
             const dist2 = dx * dx + dy * dy;
             if (dist2 < nearestDist2) {
               nearestDist2 = dist2;
-              nearest = { mmsi: tr.mmsi, x, y, ts: point.ts, heading: point.heading };
+              nearest = { mmsi: ping.mmsi, x, y, ts: ping.ts, heading: ping.heading };
             }
-          }
-        }
-      }
-
-      // Latest vessel pings.
-      for (const ping of pingStore.pings) {
-        const coordinates: [number, number] = [ping.lon, ping.lat];
-        if (geoDistance(coordinates, center) > Math.PI / 2) continue;
-        const projected = projection(coordinates);
-        if (!projected) continue;
-        const [x, y] = projected;
-
-        ctx.beginPath();
-        ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
-        ctx.fillStyle = colorForMmsi(ping.mmsi);
-        ctx.fill();
-
-        if (checkHover) {
-          const dx = x - mouse.x;
-          const dy = y - mouse.y;
-          const dist2 = dx * dx + dy * dy;
-          if (dist2 < nearestDist2) {
-            nearestDist2 = dist2;
-            nearest = { mmsi: ping.mmsi, x, y, ts: ping.ts, heading: ping.heading };
           }
         }
       }
@@ -373,10 +411,10 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
 
       // Glowing pulse on selected/highlighted vessels: each dot breathes from
       // 1× to 4× the ping size and back, once per second.
-      if (pingStore.highlightMmsis.length > 0) {
+      if (layerStore.deviceTracksVisible && pingStore.highlightMmsis.length > 0) {
         const byMmsi = new Map(pingStore.pings.map((p) => [p.mmsi, p]));
         const pulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
-        const radius = PING_RADIUS * (1 + 3 * pulse);
+        const radius = RECENT_PING_RADIUS * (1 + 3 * pulse);
         for (const hm of pingStore.highlightMmsis) {
           const hp = byMmsi.get(hm);
           if (!hp) continue;
@@ -398,6 +436,31 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
         }
       }
 
+      // Geofence enter/exit events: fixed-size red square icons.
+      let nearestEvent: EventHover | null = null;
+      if (layerStore.geofenceVisible && geofenceIconReady) {
+        const half = GEOFENCE_ICON_SIZE / 2;
+        let nearestEventDist2 = EVENT_HOVER_RADIUS * EVENT_HOVER_RADIUS;
+        for (const ev of eventStore.geofence) {
+          const coordinates: [number, number] = [ev.lon, ev.lat];
+          if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+          const projected = projection(coordinates);
+          if (!projected) continue;
+          const [x, y] = projected;
+          ctx.drawImage(geofenceIcon, x - half, y - half, GEOFENCE_ICON_SIZE, GEOFENCE_ICON_SIZE);
+
+          if (checkHover) {
+            const dx = x - mouse.x;
+            const dy = y - mouse.y;
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < nearestEventDist2) {
+              nearestEventDist2 = dist2;
+              nearestEvent = { event: ev, x, y };
+            }
+          }
+        }
+      }
+
       // Notify when the hovered ping changes (keyed on mmsi + timestamp so
       // moving between pings of the same track refreshes the tooltip).
       const nextKey = nearest ? `${nearest.mmsi}|${nearest.ts}` : null;
@@ -407,11 +470,21 @@ export function GlobeCanvas({ onHover, onEezHover, onSelect }: GlobeCanvasProps)
         onHoverRef.current?.(nearest);
       }
 
-      // EEZ boundary hover (only when no ping is under the cursor). Find the
+      // Event hover (below pings in priority).
+      const activeEvent = nearest ? null : nearestEvent;
+      const nextEventKey = activeEvent
+        ? `${activeEvent.event.mmsi}|${activeEvent.event.ts}|${activeEvent.event.eventType}`
+        : null;
+      if (nextEventKey !== eventHoveredKey) {
+        eventHoveredKey = nextEventKey;
+        onEventHoverRef.current?.(activeEvent);
+      }
+
+      // EEZ boundary hover (only when no ping or event is under the cursor). Find the
       // nearest boundary vertex by planar distance, then confirm it's within a
       // few pixels on screen.
       let eezName: string | null = null;
-      if (globe.showEez && checkHover && !nearest && eezPoints && projection.invert) {
+      if (globe.showEez && checkHover && !nearest && !activeEvent && eezPoints && projection.invert) {
         const geo = projection.invert([mouse.x, mouse.y]);
         if (geo) {
           const [glon, glat] = geo;

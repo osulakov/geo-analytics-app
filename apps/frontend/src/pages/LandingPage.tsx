@@ -3,8 +3,15 @@ import { useEffect, useState } from 'react';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
 import { DateRangeWidget } from '../components/DateRangeWidget';
-import { GlobeCanvas, type EezHover, type PingHover } from '../components/GlobeCanvas';
+import { EventTooltip } from '../components/EventTooltip';
+import {
+  GlobeCanvas,
+  type EezHover,
+  type EventHover,
+  type PingHover,
+} from '../components/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
+import { LayersWidget } from '../components/LayersWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { VesselModal } from '../components/VesselModal';
 import { VesselsWidget } from '../components/VesselsWidget';
@@ -15,12 +22,14 @@ export function LandingPage() {
   const stores = useStores();
   const [hover, setHover] = useState<PingHover | null>(null);
   const [eezHover, setEezHover] = useState<EezHover | null>(null);
+  const [eventHover, setEventHover] = useState<EventHover | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     stores.ping.load();
     stores.vessel.load();
     stores.group.loadGroups();
+    stores.event.loadGeofence(stores.ping.fromDate, stores.ping.toDate);
   }, [stores]);
 
   const handleSelect = (mmsi: string) => {
@@ -56,13 +65,19 @@ export function LandingPage() {
         background: 'radial-gradient(circle at 50% 40%, #11151b 0%, #0b0d10 70%)',
       }}
     >
-      <GlobeCanvas onHover={setHover} onEezHover={setEezHover} onSelect={handleSelect} />
+      <GlobeCanvas
+        onHover={setHover}
+        onEezHover={setEezHover}
+        onEventHover={setEventHover}
+        onSelect={handleSelect}
+      />
       <GlobeControls />
       <ShipCounter />
       <div className="left-stack">
         <Brand />
         <DateRangeWidget />
         <VesselsWidget />
+        <LayersWidget />
         <ChatWidget />
       </div>
       {hover && !selected && (
@@ -74,7 +89,10 @@ export function LandingPage() {
           heading={hover.heading}
         />
       )}
-      {eezHover && !hover && !selected && (
+      {eventHover && !hover && !selected && (
+        <EventTooltip event={eventHover.event} x={eventHover.x} y={eventHover.y} />
+      )}
+      {eezHover && !hover && !eventHover && !selected && (
         <div className="eez-tooltip" style={{ left: eezHover.x + 14, top: eezHover.y + 14 }}>
           {eezHover.name}
         </div>

@@ -17,22 +17,45 @@
   --accent-hover: color-mix(in srgb, var(--color-primary), white 12%);
   --accent-soft: color-mix(in srgb, var(--color-primary) 55%, transparent);
 
+  /* Raw spacing scale */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 18px;
+
+  /* Semantic spacing — tune these to reshape the UI */
+  --widget-padding: var(--space-7); /* inner padding of widget panels */
+  --modal-padding: var(--space-9); /* inner padding of dialogs / modals */
+  --widget-gap: 12px; /* gap between widgets and major rows (10px +20%) */
+  --element-gap: 7.2px; /* gap inside lists / between small items (6px +20%) */
+  --text-gap: 4.8px; /* gap between text lines / label↔value (4px +20%) */
+  --element-padding-y: var(--space-4); /* small element vertical padding */
+  --element-padding-x: var(--space-6); /* small element horizontal padding */
+
   /* Radii */
   --radius-xs: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --widget-radius: var(--radius-lg); /* widget / modal corners */
+  --element-radius: var(--radius-md); /* button / input / row corners */
 
   /* Effects */
   --blur-panel: blur(10px);
   --blur-control: blur(6px);
   --transition: 0.15s ease;
+  /* Subtle glow on widget wrappers (faint white halo + soft depth shadow). */
+  --widget-glow: 0 0 24px rgba(255, 255, 255, 0.072), 0 6px 20px rgba(0, 0, 0, 0.35);
 
   /* Disabled state */
   --disabled-opacity: 0.4;
 
   /* Typography */
-  --font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   font-family: var(--font-family);
   color-scheme: dark;
@@ -68,18 +91,18 @@ body {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--element-gap);
 }
 
 .globe-controls__zoom {
   width: 36px;
-  padding: 3px 0;
+  padding: var(--space-1) 0;
   text-align: center;
   font-size: 10px;
   line-height: 1;
   color: var(--color-fg);
   background: var(--surface-control);
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   backdrop-filter: var(--blur-control);
   opacity: 0.85;
 }
@@ -95,7 +118,7 @@ body {
   color: var(--color-fg);
   background: var(--surface-control);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   cursor: pointer;
   backdrop-filter: var(--blur-control);
   transition: background var(--transition);
@@ -134,14 +157,14 @@ body {
   max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--widget-gap);
 }
 
 .brand {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--text-gap);
   padding: 2px 4px 6px;
 }
 
@@ -173,10 +196,10 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 11px 14px;
+  padding: var(--element-padding-y) var(--widget-padding);
   background: var(--surface-panel);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   color: var(--color-fg);
   font-family: inherit;
@@ -200,23 +223,23 @@ body {
 
 .date-range__dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--element-gap));
   left: 0;
   right: 0;
   z-index: 25;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--widget-gap);
+  padding: var(--widget-padding);
   background: rgba(20, 24, 31, 0.45);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: blur(10px);
 }
 
 .date-range__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--text-gap);
   font-size: 11px;
   color: var(--color-fg);
 }
@@ -226,9 +249,9 @@ body {
 }
 
 .date-range__field input {
-  padding: 7px 9px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--surface-input);
   color: var(--color-fg);
   font-family: inherit;
@@ -239,9 +262,9 @@ body {
 
 .date-range__apply {
   margin-top: 2px;
-  padding: 9px 12px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--accent);
   color: var(--color-fg);
   font-family: inherit;
@@ -259,7 +282,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--surface-panel);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   overflow: hidden;
 }
@@ -269,13 +292,13 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 11px 14px 8px;
+  padding: var(--widget-padding) var(--widget-padding) var(--element-gap);
   background: none;
   border: none;
   color: var(--color-fg);
   font-family: inherit;
   font-size: 14px;
-  font-weight: 600;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -289,14 +312,14 @@ body {
 }
 
 .vessels-widget__search {
-  padding: 0 12px 12px;
+  padding: 0 var(--widget-padding) var(--widget-padding);
 }
 
 .vessels-widget__search input {
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--surface-input);
   color: var(--color-fg);
   font-family: inherit;
@@ -307,28 +330,65 @@ body {
 .vessels-widget__list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 0 12px 12px;
+  gap: var(--element-gap);
+  padding: 0 var(--widget-padding) var(--widget-padding);
 }
 
 .vessel-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--element-gap);
   width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--radius-md);
+  padding: var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
-  color: var(--color-fg);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
   transition: background var(--transition);
 }
 
 .vessel-row:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.vessel-row__select {
+  display: flex;
+  align-items: center;
+  gap: var(--widget-gap);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vessel-row__path {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--element-radius);
+  background: none;
+  color: var(--color-fg);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition), color var(--transition);
+}
+
+.vessel-row__path:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vessel-row__path.is-active {
+  color: var(--color-primary);
+  opacity: 1;
 }
 
 .vessel-row__color {
@@ -344,7 +404,6 @@ body {
 
 .vessel-row__name {
   font-size: 13px;
-  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -359,7 +418,7 @@ body {
 }
 
 .vessels-widget__empty {
-  padding: 8px;
+  padding: var(--element-padding-y);
   font-size: 12px;
   opacity: 0.6;
 }
@@ -368,8 +427,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding-top: 4px;
+  gap: var(--element-padding-x);
+  padding-top: var(--text-gap);
   font-size: 12px;
 }
 
@@ -384,7 +443,7 @@ body {
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--surface-control);
   color: var(--color-fg);
   font-size: 14px;
@@ -396,6 +455,126 @@ body {
   cursor: default;
 }
 
+.layers-widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+}
+
+.layers-widget__title {
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.layer {
+  display: flex;
+  flex-direction: column;
+}
+
+.layer__header {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.layer__expand {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  flex: 1;
+  min-width: 0;
+  padding: var(--text-gap) 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.layer__chevron {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.layer__chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.layer__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer__name--leaf {
+  flex: 1;
+  min-width: 0;
+  /* Indent past where the chevron (12px) + gap would sit, so leaf titles line
+     up with chevroned ones like "Device tracks". */
+  padding: var(--text-gap) 0 var(--text-gap) calc(12px + var(--element-gap));
+  font-size: 13px;
+}
+
+.layer__sublayers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--element-gap) 0 var(--text-gap) var(--space-8);
+}
+
+.sublayer {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  font-size: 12px;
+}
+
+.sublayer__name {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Custom box-in-box checkbox: square outline with an inner square that fills
+   with the primary color when checked (no checkmark). */
+.box-checkbox {
+  --checkbox-size: 15px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(1.05 * var(--checkbox-size));
+  height: calc(1.05 * var(--checkbox-size));
+  padding: 0;
+  border: 1px solid var(--color-fg);
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.box-checkbox__fill {
+  box-sizing: border-box;
+  width: calc(0.68 * var(--checkbox-size));
+  height: calc(0.68 * var(--checkbox-size));
+  background: transparent;
+  transition: background var(--transition);
+}
+
+.box-checkbox.is-checked .box-checkbox__fill {
+  background: var(--color-primary);
+}
+
 .chat-widget {
   width: 100%;
   height: 70vh;
@@ -403,7 +582,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--surface-panel);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   overflow: hidden;
 }
@@ -446,16 +625,16 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 16px;
+  padding: var(--widget-padding);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--widget-gap);
 }
 
 .chat-message {
   max-width: 85%;
-  padding: 8px 12px;
-  border-radius: var(--radius-lg);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--widget-radius);
   font-size: 14px;
   line-height: 1.4;
   white-space: pre-wrap;
@@ -476,14 +655,14 @@ body {
 
 .chat-widget__input {
   display: flex;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
 }
 
 .chat-widget__input input {
   flex: 1;
-  padding: 9px 12px;
-  border-radius: var(--radius-md);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
   border: none;
   background: var(--surface-input);
   color: var(--color-fg);
@@ -496,7 +675,7 @@ body {
   align-items: center;
   justify-content: center;
   width: 38px;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   border: none;
   background: var(--accent);
   color: var(--color-fg);
@@ -521,10 +700,10 @@ body {
   z-index: 20;
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: var(--element-gap);
+  padding: var(--element-padding-y) var(--widget-padding);
   background: var(--surface-panel);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   color: var(--color-fg);
   font-size: 13px;
@@ -553,10 +732,10 @@ body {
   position: relative;
   min-width: 260px;
   max-width: 320px;
-  padding: 18px 20px;
+  padding: var(--modal-padding);
   /* Same translucent + blurred background as the tooltip. */
   background: rgba(20, 24, 31, 0.4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: blur(6px);
   color: var(--color-fg);
   font-size: 13px;
@@ -589,21 +768,21 @@ body {
   font-size: 15px;
   font-weight: 700;
   color: var(--color-primary);
-  margin-bottom: 12px;
+  margin-bottom: var(--element-padding-x);
   padding-right: 20px;
 }
 
 .vessel-modal__list {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-8);
   display: grid;
-  gap: 4px;
+  gap: var(--text-gap);
   font-size: 12px;
 }
 
 .vessel-modal__list > div {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-8);
 }
 
 .vessel-modal__list dt {
@@ -617,15 +796,16 @@ body {
 
 .vessel-modal__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--element-gap);
 }
 
 .vessel-modal__path,
 .vessel-modal__group {
   flex: 1;
+  /* Intentionally compact (35% smaller) — kept raw. */
   padding: 5.85px 7.8px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   font-family: inherit;
   font-size: 10.56px;
   font-weight: 600;
@@ -652,25 +832,25 @@ body {
 }
 
 .vessel-modal__groups {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: var(--widget-padding);
+  padding-top: var(--widget-padding);
   border-top: 1px solid rgba(148, 163, 184, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--widget-gap);
 }
 
 .vessel-modal__group-create {
   display: flex;
-  gap: 8px;
+  gap: var(--element-gap);
 }
 
 .vessel-modal__group-create input {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--surface-input);
   color: var(--color-fg);
   font-family: inherit;
@@ -679,9 +859,9 @@ body {
 }
 
 .vessel-modal__group-create button {
-  padding: 8px 14px;
+  padding: var(--element-padding-y) var(--widget-padding);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--accent);
   color: var(--color-fg);
   font-family: inherit;
@@ -698,7 +878,7 @@ body {
 .vessel-modal__group-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--element-gap);
   max-height: 160px;
   overflow-y: auto;
 }
@@ -712,9 +892,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 6px 4px 6px 8px;
-  border-radius: var(--radius-md);
+  gap: var(--widget-gap);
+  padding: var(--element-gap) var(--text-gap) var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
   font-size: 12px;
 }
@@ -726,7 +906,7 @@ body {
 .vessel-modal__group-item button {
   padding: 5px 12px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: var(--accent);
   color: var(--color-fg);
   font-family: inherit;
@@ -754,7 +934,7 @@ body {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  padding: 4px;
+  padding: var(--text-gap);
   border: none;
   background: none;
   color: var(--color-fg);
@@ -780,29 +960,29 @@ body {
 .confirm-dialog {
   min-width: 240px;
   max-width: 300px;
-  padding: 18px 20px;
+  padding: var(--modal-padding);
   background: rgba(20, 24, 31, 0.4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: blur(6px);
   color: var(--color-fg);
   font-size: 13px;
 }
 
 .confirm-dialog__text {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-8);
 }
 
 .confirm-dialog__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--element-gap);
 }
 
 .confirm-dialog__cancel,
 .confirm-dialog__delete {
   flex: 1;
-  padding: 8px 12px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   color: var(--color-fg);
   font-family: inherit;
   font-size: 12px;
@@ -828,26 +1008,26 @@ body {
 }
 
 .vessels-widget__groups {
-  margin-top: 4px;
-  padding-top: 10px;
+  margin-top: var(--text-gap);
+  padding-top: var(--widget-gap);
   border-top: 1px solid rgba(148, 163, 184, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--element-gap);
 }
 
 .vessels-widget__groups-title {
   font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 2px;
+  text-transform: uppercase;
+  margin-bottom: var(--space-1);
 }
 
 .group-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px 4px 8px;
-  border-radius: var(--radius-md);
+  gap: var(--element-gap);
+  padding: var(--text-gap) var(--element-gap) var(--text-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
   font-size: 12px;
 }
@@ -873,7 +1053,7 @@ body {
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: none;
   color: var(--color-fg);
   opacity: 0.6;
@@ -908,9 +1088,9 @@ body {
   position: relative;
   width: 320px;
   max-width: calc(100vw - 40px);
-  padding: 18px 20px;
+  padding: var(--modal-padding);
   background: var(--surface-panel);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   color: var(--color-fg);
 }
@@ -942,17 +1122,17 @@ body {
   font-size: 15px;
   font-weight: 700;
   color: var(--color-primary);
-  margin-bottom: 12px;
+  margin-bottom: var(--element-padding-x);
   padding-right: 20px;
 }
 
 .group-edit__list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--element-gap);
   max-height: 260px;
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-8);
 }
 
 .group-edit__empty {
@@ -963,9 +1143,9 @@ body {
 .group-edit__item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 6px 6px 8px;
-  border-radius: var(--radius-md);
+  gap: var(--widget-gap);
+  padding: var(--element-gap) var(--element-gap) var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -1003,7 +1183,7 @@ body {
   height: 22px;
   padding: 0;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   background: none;
   color: var(--color-fg);
   font-size: 16px;
@@ -1019,15 +1199,15 @@ body {
 
 .group-edit__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--element-gap);
 }
 
 .group-edit__cancel,
 .group-edit__save {
   flex: 1;
-  padding: 9px 12px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   color: var(--color-fg);
   font-family: inherit;
   font-size: 13px;
@@ -1057,38 +1237,69 @@ body {
   z-index: 30;
   pointer-events: none;
   max-width: 240px;
-  padding: 7px 11px;
+  padding: var(--element-padding-y) var(--element-padding-x);
   background: rgba(20, 24, 31, 0.4);
-  border-radius: var(--radius-md);
+  border-radius: var(--element-radius);
   backdrop-filter: blur(6px);
   color: var(--color-fg);
   font-size: 12px;
 }
 
-.vessel-tooltip {
+.vessel-tooltip,
+.event-tooltip {
   position: fixed;
   z-index: 30;
   pointer-events: none;
   min-width: 210px;
+  /* Intentionally roomy — kept raw. */
   padding: 15px 17px;
   background: rgba(20, 24, 31, 0.4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--widget-radius);
   backdrop-filter: blur(6px);
   font-size: 12px;
   color: var(--color-fg);
+}
+
+.event-tooltip__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: var(--element-gap);
+}
+
+.event-tooltip__list {
+  margin: 0;
+  display: grid;
+  gap: var(--text-gap);
+  font-size: 0.85em;
+}
+
+.event-tooltip__list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.event-tooltip__list dt {
+  opacity: 0.55;
+}
+
+.event-tooltip__list dd {
+  margin: 0;
+  text-align: right;
 }
 
 .vessel-tooltip__title {
   font-size: 12px;
   font-weight: 700;
   color: var(--color-primary);
-  margin-bottom: 6px;
+  margin-bottom: var(--element-gap);
 }
 
 .vessel-tooltip__list {
   margin: 0;
   display: grid;
-  gap: 3px;
+  gap: var(--text-gap);
   /* 20% smaller than the tooltip's base font; title keeps its own size. */
   font-size: 0.8em;
 }
@@ -1096,7 +1307,7 @@ body {
 .vessel-tooltip__list > div {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-8);
 }
 
 .vessel-tooltip__list dt {
@@ -1106,4 +1317,19 @@ body {
 .vessel-tooltip__list dd {
   margin: 0;
   text-align: right;
+}
+
+/* Subtle glow on every widget / dialog / tooltip wrapper. */
+.date-range__trigger,
+.date-range__dropdown,
+.vessels-widget,
+.layers-widget,
+.chat-widget,
+.ship-counter,
+.vessel-modal,
+.group-edit,
+.confirm-dialog,
+.vessel-tooltip,
+.eez-tooltip {
+  box-shadow: var(--widget-glow);
 }

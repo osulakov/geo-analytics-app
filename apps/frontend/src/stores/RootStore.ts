@@ -1,6 +1,8 @@
 import { ChatStore } from './ChatStore';
+import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
+import { LayerStore } from './LayerStore';
 import { PingStore } from './PingStore';
 import { VesselStore } from './VesselStore';
 
@@ -11,6 +13,8 @@ export class RootStore {
   ping: PingStore;
   vessel: VesselStore;
   group: GroupStore;
+  layers: LayerStore;
+  event: EventStore;
 
   constructor() {
     this.globe = new GlobeStore();
@@ -18,5 +22,7 @@ export class RootStore {
     this.ping = new PingStore();
     this.vessel = new VesselStore();
     this.group = new GroupStore();
+    this.layers = new LayerStore();
+    this.event = new EventStore();
   }
 }

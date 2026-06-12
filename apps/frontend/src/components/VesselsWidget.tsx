@@ -46,6 +46,16 @@ export const VesselsWidget = observer(function VesselsWidget() {
     if (latest) globe.flyTo(latest.lon, latest.lat);
   };
 
+  const isPathShown = (mmsi: string) =>
+    ping.tracks.length === 1 && ping.tracks[0].mmsi === mmsi;
+
+  const togglePath = (mmsi: string) => {
+    // Clicking the path button also selects the vessel (glow + fly-to).
+    handleVesselClick(mmsi);
+    if (isPathShown(mmsi)) ping.clearTracks();
+    else void ping.showTrack(mmsi);
+  };
+
   const toggleShowGroup = (g: VesselGroup) => {
     if (ping.shownGroupId === g.id) {
       ping.hideGroup();
@@ -118,23 +128,48 @@ export const VesselsWidget = observer(function VesselsWidget() {
             <div className="vessels-widget__empty">No vessels found</div>
           ) : (
             pageItems.map((v) => (
-              <button
-                key={v.mmsi}
-                type="button"
-                className="vessel-row"
-                onClick={() => handleVesselClick(v.mmsi)}
-              >
-                <span
-                  className="vessel-row__color"
-                  style={{ background: colorForMmsi(v.mmsi) }}
-                />
-                <div className="vessel-row__info">
-                  <div className="vessel-row__name">{v.vesselName}</div>
-                  <div className="vessel-row__meta">
-                    {v.mmsi} · {v.flagState ?? '—'} · {v.vesselType ?? '—'}
+              <div key={v.mmsi} className="vessel-row">
+                <button
+                  type="button"
+                  className="vessel-row__select"
+                  onClick={() => handleVesselClick(v.mmsi)}
+                >
+                  <span
+                    className="vessel-row__color"
+                    style={{ background: colorForMmsi(v.mmsi) }}
+                  />
+                  <div className="vessel-row__info">
+                    <div className="vessel-row__name">{v.vesselName}</div>
+                    <div className="vessel-row__meta">
+                      {v.mmsi} · {v.flagState ?? '—'} · {v.vesselType ?? '—'}
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  className={`vessel-row__path${isPathShown(v.mmsi) ? ' is-active' : ''}`}
+                  title="Show all path"
+                  aria-label="Show all path"
+                  onClick={() => togglePath(v.mmsi)}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="5 17 12 10 19 5" />
+                    <circle cx="5" cy="17" r="2" fill="currentColor" stroke="none" />
+                    <circle cx="12" cy="10" r="2" fill="currentColor" stroke="none" />
+                    <circle cx="19" cy="5" r="2" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+              </div>
             ))
           )}
 

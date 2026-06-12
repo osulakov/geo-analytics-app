@@ -36,7 +36,7 @@ export const DateRangeWidget = observer(function DateRangeWidget() {
 
   const apply = () => {
     ping.applyRange(fromDraft, toDraft);
-    void event.loadGeofence(fromDraft, toDraft);
+    void event.loadGeofence(ping.rangeStartIso, ping.rangeEndIso, ping.viewport);
     setOpen(false);
   };
 

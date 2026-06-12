@@ -23,6 +23,20 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
+/**
+ * Build a viewport spherical-cap condition from ?lon&lat&radius (metres),
+ * appending the params to `values`. Returns null when no viewport is given.
+ */
+function capCondition(url: URL, values: string[]): string | null {
+  const lon = url.searchParams.get('lon');
+  const lat = url.searchParams.get('lat');
+  const radius = url.searchParams.get('radius');
+  if (lon === null || lat === null || radius === null) return null;
+  values.push(lon, lat, radius);
+  const n = values.length;
+  return `ST_DWithin(position, ST_SetSRID(ST_MakePoint($${n - 2}::float8, $${n - 1}::float8), 4326)::geography, $${n}::float8)`;
+}
+
 interface GroupRow {
   id: number;
   name: string;
@@ -37,6 +51,25 @@ const VESSEL_COLUMNS =
   'mmsi, imo, vessel_name, callsign, flag_state, vessel_type, length_m, width_m, draft_m';
 
 const num = (value: string | null): number | null => (value === null ? null : Number(value));
+
+function mapSatellite(row: Record<string, string | null>) {
+  return {
+    name: row.name,
+    constellation: row.constellation,
+    altitudeKm: num(row.altitude_km),
+    inclinationDeg: num(row.inclination_deg),
+    orbitalPeriodMin: num(row.orbital_period_min),
+    swathWidthKm: num(row.swath_width_km),
+    groundVelocityKmSec: num(row.ground_velocity_km_sec),
+    lookAngleDeg: num(row.look_angle_deg),
+    raanDeg: num(row.raan_deg),
+    meanAnomalyDeg: num(row.mean_anomaly_deg),
+  };
+}
+
+const SATELLITE_COLUMNS =
+  'name, constellation, altitude_km, inclination_deg, orbital_period_min, ' +
+  'swath_width_km, ground_velocity_km_sec, look_angle_deg, raan_deg, mean_anomaly_deg';
 
 function mapVessel(row: Record<string, string | null>) {
   return {
@@ -219,6 +252,21 @@ export function vesselsApiPlugin(): Plugin {
             return;
           }
 
+          if (pathname === '/satellites') {
+            // The satellites table is seeded by data_scripts/satellites.sh;
+            // return [] if it hasn't been created yet.
+            const reg = await getPool().query("SELECT to_regclass('public.satellites') AS t");
+            if (!reg.rows[0].t) {
+              json(200, []);
+              return;
+            }
+            const { rows } = await getPool().query(
+              `SELECT ${SATELLITE_COLUMNS} FROM satellites ORDER BY name`,
+            );
+            json(200, rows.map(mapSatellite));
+            return;
+          }
+
           const vesselMatch = pathname.match(/^\/vessels\/(\d{1,9})$/);
           if (vesselMatch) {
             const { rows } = await getPool().query(
@@ -259,6 +307,48 @@ export function vesselsApiPlugin(): Plugin {
                  FROM ais_pings
                  ${where}
                 ORDER BY mmsi, ts DESC`,
+              values,
+            );
+            json(
+              200,
+              rows.map((row) => ({
+                mmsi: row.mmsi,
+                ts: row.ts,
+                lon: Number(row.lon),
+                lat: Number(row.lat),
+                heading: num(row.heading),
+              })),
+            );
+            return;
+          }
+
+          if (pathname === '/pings') {
+            // All pings within a time range + optional viewport cap. The client
+            // computes the latest-per-vessel and time-window filtering.
+            const conditions: string[] = [];
+            const values: string[] = [];
+            const from = url.searchParams.get('from');
+            const to = url.searchParams.get('to');
+            if (from) {
+              values.push(from);
+              conditions.push(`ts >= $${values.length}`);
+            }
+            if (to) {
+              values.push(to);
+              conditions.push(`ts <= $${values.length}`);
+            }
+            const cap = capCondition(url, values);
+            if (cap) conditions.push(cap);
+            const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+            const { rows } = await getPool().query(
+              `SELECT mmsi, ts,
+                      ST_X(position::geometry) AS lon,
+                      ST_Y(position::geometry) AS lat,
+                      heading
+                 FROM ais_pings
+                 ${where}
+                ORDER BY mmsi, ts`,
               values,
             );
             json(
@@ -340,6 +430,8 @@ export function vesselsApiPlugin(): Plugin {
               values.push(to);
               conditions.push(`ts <= $${values.length}`);
             }
+            const cap = capCondition(url, values);
+            if (cap) conditions.push(cap);
 
             const { rows } = await getPool().query(
               `SELECT mmsi, event_type, subtype, ts, details,

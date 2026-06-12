@@ -4,6 +4,7 @@ import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
 import { LayerStore } from './LayerStore';
 import { PingStore } from './PingStore';
+import { SatelliteStore } from './SatelliteStore';
 import { VesselStore } from './VesselStore';
 
 /** Aggregates all domain stores. New stores get wired in here. */
@@ -12,6 +13,7 @@ export class RootStore {
   chat: ChatStore;
   ping: PingStore;
   vessel: VesselStore;
+  satellite: SatelliteStore;
   group: GroupStore;
   layers: LayerStore;
   event: EventStore;
@@ -21,6 +23,7 @@ export class RootStore {
     this.chat = new ChatStore();
     this.ping = new PingStore();
     this.vessel = new VesselStore();
+    this.satellite = new SatelliteStore();
     this.group = new GroupStore();
     this.layers = new LayerStore();
     this.event = new EventStore();

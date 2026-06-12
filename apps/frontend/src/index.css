@@ -160,6 +160,20 @@ body {
   gap: var(--widget-gap);
 }
 
+.right-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  width: 25vw;
+  min-width: 280px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--widget-gap);
+}
+
 .brand {
   display: flex;
   flex-direction: column;
@@ -470,6 +484,204 @@ body {
   text-transform: uppercase;
 }
 
+.satellites-widget {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  overflow: hidden;
+}
+
+.satellites-widget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--widget-padding) var(--widget-padding) var(--element-gap);
+  background: none;
+  border: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 14px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.satellites-widget__chevron {
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.satellites-widget:not(.is-collapsed) .satellites-widget__chevron {
+  transform: rotate(180deg);
+}
+
+.satellites-widget__search {
+  padding: 0 var(--widget-padding) var(--widget-padding);
+}
+
+.satellites-widget__search input {
+  width: 100%;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.satellites-widget__empty {
+  padding: var(--element-padding-y);
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.satellites-widget__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--element-padding-x);
+  padding: var(--text-gap) var(--widget-padding) var(--widget-padding);
+  font-size: 12px;
+}
+
+.satellites-widget__count {
+  opacity: 0.5;
+}
+
+.satellites-widget__pager button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.satellites-widget__pager button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.satellites-widget__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: 0 var(--widget-padding) var(--element-gap);
+}
+
+.satellite-row {
+  display: flex;
+  flex-direction: column;
+  padding: var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+  transition: background var(--transition);
+}
+
+.satellite-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.satellite-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.satellite-row__name {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.satellite-row__name > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.satellite-row__chevron {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.satellite-row__chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.satellite-row__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  /* 30% smaller than the standard 24px / 18px row-icon size. */
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: none;
+  border-radius: var(--element-radius);
+  background: none;
+  color: var(--color-fg);
+  font-size: 13px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition), color var(--transition);
+}
+
+.satellite-row__icon:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.satellite-row__icon.is-active {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+.satellite-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  padding: var(--text-gap) 0 var(--element-gap) calc(12px + var(--element-gap));
+}
+
+.satellite-detail__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--element-gap);
+  font-size: 12px;
+}
+
+.satellite-detail__label {
+  opacity: 0.6;
+}
+
+.satellite-detail__value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .layer {
   display: flex;
   flex-direction: column;
@@ -693,11 +905,89 @@ body {
   cursor: default;
 }
 
-.ship-counter {
+.time-slider {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 20;
+  width: 60vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+}
+
+.time-slider__window {
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+  opacity: 0.85;
+}
+
+.time-slider__track {
+  position: relative;
+  height: 4px;
+  margin: 6px 8px 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.time-slider__range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+.time-slider__range-grab {
+  position: absolute;
+  top: 50%;
+  height: 18px;
+  transform: translateY(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.time-slider__range-grab:active {
+  cursor: grabbing;
+}
+
+.time-slider__handle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.time-slider__ticks {
+  position: relative;
+  height: 14px;
+  margin: 0 8px;
+}
+
+.time-slider__tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10px;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.ship-counter {
+  align-self: flex-end;
   display: flex;
   align-items: baseline;
   gap: var(--element-gap);
@@ -1324,8 +1614,10 @@ body {
 .date-range__dropdown,
 .vessels-widget,
 .layers-widget,
+.satellites-widget,
 .chat-widget,
 .ship-counter,
+.time-slider,
 .vessel-modal,
 .group-edit,
 .confirm-dialog,

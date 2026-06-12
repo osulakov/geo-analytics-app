@@ -12,7 +12,9 @@ import {
 } from '../components/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
+import { SatellitesWidget } from '../components/SatellitesWidget';
 import { ShipCounter } from '../components/ShipCounter';
+import { TimeSlider } from '../components/TimeSlider';
 import { VesselModal } from '../components/VesselModal';
 import { VesselsWidget } from '../components/VesselsWidget';
 import { VesselTooltip } from '../components/VesselTooltip';
@@ -26,11 +28,17 @@ export function LandingPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    stores.ping.load();
+    // Pings/events load per-viewport once the globe reports its first cap.
     stores.vessel.load();
+    stores.satellite.load();
     stores.group.loadGroups();
-    stores.event.loadGeofence(stores.ping.fromDate, stores.ping.toDate);
   }, [stores]);
+
+  // Reload pings + events for the visible cap whenever the view settles.
+  const handleViewport = (cap: { lon: number; lat: number; radius: number }) => {
+    stores.ping.setViewport(cap);
+    void stores.event.loadGeofence(stores.ping.rangeStartIso, stores.ping.rangeEndIso, cap);
+  };
 
   const handleSelect = (mmsi: string) => {
     // Opening the modal clears the hover tooltip and any previous path, and
@@ -70,9 +78,14 @@ export function LandingPage() {
         onEezHover={setEezHover}
         onEventHover={setEventHover}
         onSelect={handleSelect}
+        onViewportChange={handleViewport}
       />
       <GlobeControls />
-      <ShipCounter />
+      <TimeSlider />
+      <div className="right-stack">
+        <ShipCounter />
+        <SatellitesWidget />
+      </div>
       <div className="left-stack">
         <Brand />
         <DateRangeWidget />

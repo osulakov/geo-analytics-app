@@ -179,7 +179,11 @@ interface GlobeCanvasProps {
   onEventHover?: (hover: EventHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
+  /** Called (throttled, after the view settles) with the visible cap. */
+  onViewportChange?: (cap: { lon: number; lat: number; radius: number }) => void;
 }
+
+const EARTH_RADIUS_M = 6_371_000;
 
 // Point data to overlay on the globe. Any GeoJSON point features work here;
 // coordinates are [longitude, latitude].
@@ -191,7 +195,13 @@ const markers: Feature<Point>[] = [
   },
 ];
 
-export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: GlobeCanvasProps) {
+export function GlobeCanvas({
+  onHover,
+  onEezHover,
+  onEventHover,
+  onSelect,
+  onViewportChange,
+}: GlobeCanvasProps) {
   const stores = useStores();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -205,6 +215,8 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
   onEventHoverRef.current = onEventHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -324,6 +336,9 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
       // visible hemisphere is [-lambda, -phi]; markers more than 90° away are
       // on the far side of the globe and get skipped.
       const center: [number, number] = [-globe.rotationLambda, -globe.rotationPhi];
+      // Active time window (client-side filter for tracks + events).
+      const winStart = Date.parse(pingStore.windowStart);
+      const winEnd = Date.parse(pingStore.windowEnd);
       for (const marker of markers) {
         const coordinates = marker.geometry.coordinates as [number, number];
         if (geoDistance(coordinates, center) > Math.PI / 2) continue;
@@ -350,6 +365,8 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
         for (const tr of pingStore.tracks) {
           ctx.fillStyle = colorForMmsi(tr.mmsi);
           for (const point of tr.points) {
+            const pt = Date.parse(point.ts);
+            if (pt < winStart || pt > winEnd) continue;
             const coordinates: [number, number] = [point.lon, point.lat];
             if (geoDistance(coordinates, center) > Math.PI / 2) continue;
             const projected = projection(coordinates);
@@ -442,6 +459,8 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
         const half = GEOFENCE_ICON_SIZE / 2;
         let nearestEventDist2 = EVENT_HOVER_RADIUS * EVENT_HOVER_RADIUS;
         for (const ev of eventStore.geofence) {
+          const et = Date.parse(ev.ts);
+          if (et < winStart || et > winEnd) continue;
           const coordinates: [number, number] = [ev.lon, ev.lat];
           if (geoDistance(coordinates, center) > Math.PI / 2) continue;
           const projected = projection(coordinates);
@@ -660,6 +679,27 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
     canvas.addEventListener('pointerleave', onPointerLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
+    // --- Viewport reporting: emit the visible cap after the view settles ---
+    let lastViewKey = '';
+    let viewChangedAt = 0;
+    let viewDirty = true;
+    let lastEmittedKey = '';
+
+    const emitViewport = () => {
+      if (!onViewportChangeRef.current || baseRadius <= 0) return;
+      const scale = baseRadius * globe.zoom;
+      const halfDiag = Math.hypot(width / 2, height / 2);
+      const ratio = halfDiag / scale;
+      const alpha = ratio >= 1 ? Math.PI / 2 : Math.asin(ratio);
+      // 25% margin so small moves don't refetch; capped at a hemisphere.
+      const radius = Math.min(Math.PI / 2, alpha * 1.25) * EARTH_RADIUS_M;
+      onViewportChangeRef.current({
+        lon: -globe.rotationLambda,
+        lat: -globe.rotationPhi,
+        radius,
+      });
+    };
+
     let frame = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -673,6 +713,19 @@ export function GlobeCanvas({ onHover, onEezHover, onEventHover, onSelect }: Glo
         globe.flyStep(dt);
       }
       draw();
+
+      // Detect view changes (rounded) and emit the cap once they settle (~300ms).
+      const viewKey = `${globe.rotationLambda.toFixed(0)},${globe.rotationPhi.toFixed(0)},${globe.zoom.toFixed(2)}`;
+      if (viewKey !== lastViewKey) {
+        lastViewKey = viewKey;
+        viewChangedAt = now;
+        viewDirty = true;
+      } else if (viewDirty && now - viewChangedAt > 300 && viewKey !== lastEmittedKey) {
+        viewDirty = false;
+        lastEmittedKey = viewKey;
+        emitViewport();
+      }
+
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

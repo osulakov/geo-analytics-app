@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-import type { MapEvent } from '../data_loaders/events';
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
+import type { MapEvent } from "../data_loaders/events";
+import { fetchVesselByMmsi, type StaticVesselInfo } from "../data_loaders/]";
 
 interface EventTooltipProps {
   event: MapEvent;
@@ -12,8 +12,8 @@ interface EventTooltipProps {
 /** Humanize a snake/kebab event type, e.g. "geofence_enter_exit" → "Geofence Enter Exit". */
 function humanize(value: string): string {
   return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -22,7 +22,7 @@ function humanize(value: string): string {
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return (
     `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
     `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
@@ -40,28 +40,33 @@ export function EventTooltip({ event, x, y }: EventTooltipProps) {
       .then((data) => {
         if (active) setVessel(data);
       })
-      .catch((error) => console.error(`Failed to fetch vessel ${event.mmsi}:`, error));
+      .catch((error) =>
+        console.error(`Failed to fetch vessel ${event.mmsi}:`, error),
+      );
     return () => {
       active = false;
     };
   }, [event.mmsi]);
 
-  const eez = event.details && typeof event.details.eez === 'string' ? event.details.eez : null;
+  const eez =
+    event.details && typeof event.details.eez === "string"
+      ? event.details.eez
+      : null;
 
   return (
     <div className="event-tooltip" style={{ left: x + 14, top: y + 14 }}>
       <div className="event-tooltip__title">{humanize(event.eventType)}</div>
       <dl className="event-tooltip__list">
         {/* Geofence-specific: which EEZ the vessel is crossing. */}
-        {event.eventType === 'geofence_enter_exit' && (
+        {event.eventType === "geofence_enter_exit" && (
           <>
             <div>
               <dt>Direction</dt>
-              <dd>{event.subtype ? humanize(event.subtype) : '—'}</dd>
+              <dd>{event.subtype ? humanize(event.subtype) : "—"}</dd>
             </div>
             <div>
               <dt>EEZ</dt>
-              <dd>{eez ?? '—'}</dd>
+              <dd>{eez ?? "—"}</dd>
             </div>
           </>
         )}
@@ -76,11 +81,11 @@ export function EventTooltip({ event, x, y }: EventTooltipProps) {
         </div>
         <div>
           <dt>Flag</dt>
-          <dd>{vessel?.flagState ?? '—'}</dd>
+          <dd>{vessel?.flagState ?? "—"}</dd>
         </div>
         <div>
           <dt>Type</dt>
-          <dd>{vessel?.vesselType ?? '—'}</dd>
+          <dd>{vessel?.vesselType ?? "—"}</dd>
         </div>
         <div>
           <dt>Time</dt>

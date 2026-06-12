@@ -15,9 +15,20 @@ export class SatelliteStore {
   orbitOn = new Set<string>();
   /** Names currently being chased (coverage follow). */
   chasingOn = new Set<string>();
+  /** The currently selected satellite (pulses + glows on the map). */
+  selectedName: string | null = null;
 
   constructor() {
     makeAutoObservable(this);
+  }
+
+  isSelected(name: string): boolean {
+    return this.selectedName === name;
+  }
+
+  /** Toggle selection: clicking the selected satellite again clears it. */
+  select(name: string): void {
+    this.selectedName = this.selectedName === name ? null : name;
   }
 
   async load(): Promise<void> {
@@ -40,6 +51,17 @@ export class SatelliteStore {
   toggleOrbit(name: string): void {
     if (this.orbitOn.has(name)) this.orbitOn.delete(name);
     else this.orbitOn.add(name);
+  }
+
+  /** True when at least one satellite's orbit is shown. */
+  get anyOrbitOn(): boolean {
+    return this.orbitOn.size > 0;
+  }
+
+  /** Show every orbit, or hide them all if any are currently shown. */
+  toggleAllOrbits(): void {
+    if (this.orbitOn.size > 0) this.orbitOn.clear();
+    else this.orbitOn = new Set(this.satellites.map((s) => s.name));
   }
 
   isChasing(name: string): boolean {

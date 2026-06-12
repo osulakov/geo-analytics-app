@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { observer } from 'mobx-react-lite';
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { observer } from "mobx-react-lite";
 
-import { useStores } from '../stores/StoreContext';
-import { colorForMmsi } from '../layers_controller/colorMap';
-import { GroupEditModal } from './GroupEditModal';
-import type { StaticVesselInfo } from '../data_loaders/vessels';
-import type { VesselGroup } from '../data_loaders/groups';
+import { useStores } from "../stores/StoreContext";
+import { colorForMmsi } from "../layers_controller/colorMap";
+import { GroupEditModal } from "./GroupEditModal";
+import type { StaticVesselInfo } from "../data_loaders/]";
+import type { VesselGroup } from "../data_loaders/groups";
 
 const PAGE_SIZE = 5;
 
@@ -22,8 +22,8 @@ function searchableText(vessel: StaticVesselInfo): string {
     vessel.width,
     vessel.draft,
   ]
-    .map((value) => (value == null ? '' : String(value)))
-    .join(' ')
+    .map((value) => (value == null ? "" : String(value)))
+    .join(" ")
     .toLowerCase();
 }
 
@@ -35,7 +35,7 @@ function searchableText(vessel: StaticVesselInfo): string {
 export const VesselsWidget = observer(function VesselsWidget() {
   const { vessel, ping, globe, group } = useStores();
   const [expanded, setExpanded] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [editGroup, setEditGroup] = useState<VesselGroup | null>(null);
   const [pendingDelete, setPendingDelete] = useState<VesselGroup | null>(null);
@@ -88,7 +88,7 @@ export const VesselsWidget = observer(function VesselsWidget() {
   };
 
   return (
-    <div className={`vessels-widget${expanded ? '' : ' is-collapsed'}`}>
+    <div className={`vessels-widget${expanded ? "" : " is-collapsed"}`}>
       <button
         type="button"
         className="vessels-widget__header"
@@ -141,13 +141,13 @@ export const VesselsWidget = observer(function VesselsWidget() {
                   <div className="vessel-row__info">
                     <div className="vessel-row__name">{v.vesselName}</div>
                     <div className="vessel-row__meta">
-                      {v.mmsi} · {v.flagState ?? '—'} · {v.vesselType ?? '—'}
+                      {v.mmsi} · {v.flagState ?? "—"} · {v.vesselType ?? "—"}
                     </div>
                   </div>
                 </button>
                 <button
                   type="button"
-                  className={`vessel-row__path${isPathShown(v.mmsi) ? ' is-active' : ''}`}
+                  className={`vessel-row__path${isPathShown(v.mmsi) ? " is-active" : ""}`}
                   title="Show all path"
                   aria-label="Show all path"
                   onClick={() => togglePath(v.mmsi)}
@@ -164,9 +164,27 @@ export const VesselsWidget = observer(function VesselsWidget() {
                     aria-hidden="true"
                   >
                     <polyline points="5 17 12 10 19 5" />
-                    <circle cx="5" cy="17" r="2" fill="currentColor" stroke="none" />
-                    <circle cx="12" cy="10" r="2" fill="currentColor" stroke="none" />
-                    <circle cx="19" cy="5" r="2" fill="currentColor" stroke="none" />
+                    <circle
+                      cx="5"
+                      cy="17"
+                      r="2"
+                      fill="currentColor"
+                      stroke="none"
+                    />
+                    <circle
+                      cx="12"
+                      cy="10"
+                      r="2"
+                      fill="currentColor"
+                      stroke="none"
+                    />
+                    <circle
+                      cx="19"
+                      cy="5"
+                      r="2"
+                      fill="currentColor"
+                      stroke="none"
+                    />
                   </svg>
                 </button>
               </div>
@@ -184,7 +202,10 @@ export const VesselsWidget = observer(function VesselsWidget() {
             </button>
             <span>
               {currentPage + 1} / {pageCount}
-              <span className="vessels-widget__count"> · {filtered.length}</span>
+              <span className="vessels-widget__count">
+                {" "}
+                · {filtered.length}
+              </span>
             </span>
             <button
               type="button"
@@ -208,10 +229,18 @@ export const VesselsWidget = observer(function VesselsWidget() {
                   <button
                     type="button"
                     className={`group-row__icon${
-                      ping.shownGroupId === g.id ? ' is-shown' : ''
+                      ping.shownGroupId === g.id ? " is-shown" : ""
                     }`}
-                    title={ping.shownGroupId === g.id ? 'Hide from map' : 'Show on map'}
-                    aria-label={ping.shownGroupId === g.id ? 'Hide from map' : 'Show on map'}
+                    title={
+                      ping.shownGroupId === g.id
+                        ? "Hide from map"
+                        : "Show on map"
+                    }
+                    aria-label={
+                      ping.shownGroupId === g.id
+                        ? "Hide from map"
+                        : "Show on map"
+                    }
                     aria-pressed={ping.shownGroupId === g.id}
                     onClick={() => toggleShowGroup(g)}
                   >
@@ -284,13 +313,23 @@ export const VesselsWidget = observer(function VesselsWidget() {
         </div>
       )}
 
-      {editGroup && <GroupEditModal group={editGroup} onClose={() => setEditGroup(null)} />}
+      {editGroup && (
+        <GroupEditModal group={editGroup} onClose={() => setEditGroup(null)} />
+      )}
 
       {pendingDelete &&
         createPortal(
-          <div className="confirm-dialog__overlay" onClick={() => setPendingDelete(null)}>
-            <div className="confirm-dialog" onClick={(event) => event.stopPropagation()}>
-              <div className="confirm-dialog__text">Delete group “{pendingDelete.name}”?</div>
+          <div
+            className="confirm-dialog__overlay"
+            onClick={() => setPendingDelete(null)}
+          >
+            <div
+              className="confirm-dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="confirm-dialog__text">
+                Delete group “{pendingDelete.name}”?
+              </div>
               <div className="confirm-dialog__actions">
                 <button
                   type="button"
@@ -299,7 +338,11 @@ export const VesselsWidget = observer(function VesselsWidget() {
                 >
                   Cancel
                 </button>
-                <button type="button" className="confirm-dialog__delete" onClick={confirmDelete}>
+                <button
+                  type="button"
+                  className="confirm-dialog__delete"
+                  onClick={confirmDelete}
+                >
                   Delete
                 </button>
               </div>

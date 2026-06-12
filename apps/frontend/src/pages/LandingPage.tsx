@@ -12,6 +12,7 @@ import {
 } from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
+import { SatelliteCounter } from '../components/SatelliteCounter';
 import { SatellitesWidget } from '../components/SatellitesWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
@@ -83,7 +84,10 @@ export function LandingPage() {
       <GlobeControls />
       <TimeSlider />
       <div className="right-stack">
-        <ShipCounter />
+        <div className="right-stack__counters">
+          <ShipCounter />
+          <SatelliteCounter />
+        </div>
         <SatellitesWidget />
       </div>
       <div className="left-stack">

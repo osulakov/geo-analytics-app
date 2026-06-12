@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { observer } from 'mobx-react-lite';
+import { useEffect, useState } from "react";
+import { observer } from "mobx-react-lite";
 
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
-import { useStores } from '../stores/StoreContext';
+import { fetchVesselByMmsi, type StaticVesselInfo } from "../data_loaders/]";
+import { useStores } from "../stores/StoreContext";
 
 interface VesselModalProps {
   mmsi: string;
@@ -11,7 +11,7 @@ interface VesselModalProps {
 }
 
 function formatMetres(value: number | null): string {
-  return value === null ? '—' : `${value} m`;
+  return value === null ? "—" : `${value} m`;
 }
 
 /** Modal with a vessel's static info, "Show full path", and group actions. */
@@ -23,7 +23,7 @@ export const VesselModal = observer(function VesselModal({
   const { group } = useStores();
   const [vessel, setVessel] = useState<StaticVesselInfo | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupName, setNewGroupName] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -31,7 +31,9 @@ export const VesselModal = observer(function VesselModal({
       .then((data) => {
         if (active) setVessel(data);
       })
-      .catch((error) => console.error(`Failed to fetch vessel ${mmsi}:`, error));
+      .catch((error) =>
+        console.error(`Failed to fetch vessel ${mmsi}:`, error),
+      );
     return () => {
       active = false;
     };
@@ -46,7 +48,7 @@ export const VesselModal = observer(function VesselModal({
     const name = newGroupName.trim();
     if (!name) return;
     void group.createGroup(name, mmsi);
-    setNewGroupName('');
+    setNewGroupName("");
   };
 
   return (
@@ -57,11 +59,18 @@ export const VesselModal = observer(function VesselModal({
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="vessel-modal__x" type="button" aria-label="Close" onClick={onClose}>
+        <button
+          className="vessel-modal__x"
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+        >
           ×
         </button>
 
-        <div className="vessel-modal__title">{vessel ? vessel.vesselName : `${mmsi}…`}</div>
+        <div className="vessel-modal__title">
+          {vessel ? vessel.vesselName : `${mmsi}…`}
+        </div>
 
         {vessel && (
           <dl className="vessel-modal__list">
@@ -71,19 +80,19 @@ export const VesselModal = observer(function VesselModal({
             </div>
             <div>
               <dt>IMO</dt>
-              <dd>{vessel.imo ?? '—'}</dd>
+              <dd>{vessel.imo ?? "—"}</dd>
             </div>
             <div>
               <dt>Callsign</dt>
-              <dd>{vessel.callsign ?? '—'}</dd>
+              <dd>{vessel.callsign ?? "—"}</dd>
             </div>
             <div>
               <dt>Flag</dt>
-              <dd>{vessel.flagState ?? '—'}</dd>
+              <dd>{vessel.flagState ?? "—"}</dd>
             </div>
             <div>
               <dt>Type</dt>
-              <dd>{vessel.vesselType ?? '—'}</dd>
+              <dd>{vessel.vesselType ?? "—"}</dd>
             </div>
             <div>
               <dt>Length</dt>
@@ -110,7 +119,7 @@ export const VesselModal = observer(function VesselModal({
           </button>
           <button
             type="button"
-            className={`vessel-modal__group${groupOpen ? ' is-active' : ''}`}
+            className={`vessel-modal__group${groupOpen ? " is-active" : ""}`}
             aria-expanded={groupOpen}
             onClick={() => setGroupOpen((value) => !value)}
           >
@@ -127,10 +136,14 @@ export const VesselModal = observer(function VesselModal({
                 placeholder="New group name"
                 onChange={(event) => setNewGroupName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleCreate();
+                  if (event.key === "Enter") handleCreate();
                 }}
               />
-              <button type="button" onClick={handleCreate} disabled={!newGroupName.trim()}>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={!newGroupName.trim()}
+              >
                 Save
               </button>
             </div>
@@ -144,14 +157,17 @@ export const VesselModal = observer(function VesselModal({
                   return (
                     <div key={g.id} className="vessel-modal__group-item">
                       <span className="vessel-modal__group-name">
-                        {g.name} <span className="vessel-modal__group-count">({g.mmsis.length})</span>
+                        {g.name}{" "}
+                        <span className="vessel-modal__group-count">
+                          ({g.mmsis.length})
+                        </span>
                       </span>
                       <button
                         type="button"
                         disabled={inGroup}
                         onClick={() => void group.addMember(g.id, mmsi)}
                       >
-                        {inGroup ? 'Added' : 'Add'}
+                        {inGroup ? "Added" : "Add"}
                       </button>
                     </div>
                   );

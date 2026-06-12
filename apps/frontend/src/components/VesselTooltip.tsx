@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
+import { fetchVesselByMmsi, type StaticVesselInfo } from "../data_loaders/]";
 
 // Cache static info per MMSI so repeated hovers don't re-fetch.
 const cache = new Map<string, StaticVesselInfo | null>();
@@ -14,18 +14,18 @@ interface VesselTooltipProps {
 }
 
 function formatMetres(value: number | null): string {
-  return value === null ? '—' : `${value} m`;
+  return value === null ? "—" : `${value} m`;
 }
 
 function formatHeading(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}°`;
+  return value === null ? "—" : `${Math.round(value)}°`;
 }
 
 /** Format an ISO timestamp as `YYYY-MM-DD HH:MM` (UTC). */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return (
     `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
     `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
@@ -34,7 +34,9 @@ function formatTimestamp(iso: string): string {
 
 /** Tooltip showing a vessel's static info, fetched dynamically by MMSI. */
 export function VesselTooltip({ mmsi, x, y, ts, heading }: VesselTooltipProps) {
-  const [vessel, setVessel] = useState<StaticVesselInfo | null>(() => cache.get(mmsi) ?? null);
+  const [vessel, setVessel] = useState<StaticVesselInfo | null>(
+    () => cache.get(mmsi) ?? null,
+  );
 
   useEffect(() => {
     if (cache.has(mmsi)) {
@@ -47,7 +49,9 @@ export function VesselTooltip({ mmsi, x, y, ts, heading }: VesselTooltipProps) {
         cache.set(mmsi, data);
         if (active) setVessel(data);
       })
-      .catch((error) => console.error(`Failed to fetch vessel ${mmsi}:`, error));
+      .catch((error) =>
+        console.error(`Failed to fetch vessel ${mmsi}:`, error),
+      );
     return () => {
       active = false;
     };
@@ -55,7 +59,9 @@ export function VesselTooltip({ mmsi, x, y, ts, heading }: VesselTooltipProps) {
 
   return (
     <div className="vessel-tooltip" style={{ left: x + 14, top: y + 14 }}>
-      <div className="vessel-tooltip__title">{vessel ? vessel.vesselName : `${mmsi}…`}</div>
+      <div className="vessel-tooltip__title">
+        {vessel ? vessel.vesselName : `${mmsi}…`}
+      </div>
       <dl className="vessel-tooltip__list">
         {vessel && (
           <>
@@ -65,19 +71,19 @@ export function VesselTooltip({ mmsi, x, y, ts, heading }: VesselTooltipProps) {
             </div>
             <div>
               <dt>IMO</dt>
-              <dd>{vessel.imo ?? '—'}</dd>
+              <dd>{vessel.imo ?? "—"}</dd>
             </div>
             <div>
               <dt>Callsign</dt>
-              <dd>{vessel.callsign ?? '—'}</dd>
+              <dd>{vessel.callsign ?? "—"}</dd>
             </div>
             <div>
               <dt>Flag</dt>
-              <dd>{vessel.flagState ?? '—'}</dd>
+              <dd>{vessel.flagState ?? "—"}</dd>
             </div>
             <div>
               <dt>Type</dt>
-              <dd>{vessel.vesselType ?? '—'}</dd>
+              <dd>{vessel.vesselType ?? "—"}</dd>
             </div>
             <div>
               <dt>Length</dt>

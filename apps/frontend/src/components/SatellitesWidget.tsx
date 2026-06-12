@@ -26,17 +26,18 @@ function DetailRow({ label, value, unit }: { label: string; value: number | null
  */
 const SatelliteRow = observer(function SatelliteRow({ sat }: { sat: Satellite }) {
   const { satellite } = useStores();
-  const [expanded, setExpanded] = useState(false);
+  // Selecting a satellite both expands its detail and makes its ping pulse.
+  const expanded = satellite.isSelected(sat.name);
   const orbitOn = satellite.isOrbitOn(sat.name);
   const chasing = satellite.isChasing(sat.name);
 
   return (
-    <div className="satellite-row">
+    <div className={`satellite-row${expanded ? ' is-selected' : ''}`}>
       <div className="satellite-row__head">
         <button
           type="button"
           className="satellite-row__name"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => satellite.select(sat.name)}
           aria-expanded={expanded}
         >
           <svg
@@ -129,28 +130,47 @@ export const SatellitesWidget = observer(function SatellitesWidget() {
 
   return (
     <div className={`satellites-widget${expanded ? '' : ' is-collapsed'}`}>
-      <button
-        type="button"
-        className="satellites-widget__header"
-        onClick={() => setExpanded((value) => !value)}
-        aria-expanded={expanded}
-      >
-        <span>Satellites</span>
-        <svg
-          className="satellites-widget__chevron"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+      <div className="satellites-widget__header">
+        <button
+          type="button"
+          className="satellites-widget__title"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          Satellites
+        </button>
+        <button
+          type="button"
+          className={`satellite-row__icon${satellite.anyOrbitOn ? ' is-active' : ''}`}
+          title={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+          aria-label={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+          aria-pressed={satellite.anyOrbitOn}
+          onClick={() => satellite.toggleAllOrbits()}
+        >
+          <AnimationIcon fontSize="inherit" />
+        </button>
+        <button
+          type="button"
+          className="satellites-widget__chevron-btn"
+          onClick={() => setExpanded((value) => !value)}
+          aria-label={expanded ? 'Collapse list' : 'Expand list'}
+        >
+          <svg
+            className="satellites-widget__chevron"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      </div>
 
       <div className="satellites-widget__search">
         <input

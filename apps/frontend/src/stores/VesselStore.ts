@@ -1,6 +1,9 @@
-import { makeAutoObservable, runInAction } from 'mobx';
+import { makeAutoObservable, runInAction } from "mobx";
 
-import { fetchStaticVesselInfo, type StaticVesselInfo } from '../data_loaders/vessels';
+import {
+  fetchStaticVesselInfo,
+  type StaticVesselInfo,
+} from "../data_loaders/]";
 
 /** Holds the full static vessel list for the Vessels widget. */
 export class VesselStore {
@@ -20,7 +23,7 @@ export class VesselStore {
         this.loaded = true;
       });
     } catch (error) {
-      console.error('Failed to load vessels:', error);
+      console.error("Failed to load vessels:", error);
     }
   }
 }

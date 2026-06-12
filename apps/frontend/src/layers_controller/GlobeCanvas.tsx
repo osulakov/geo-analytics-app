@@ -144,6 +144,18 @@ const RECENT_PING_RADIUS = 2;
 const HOVER_RADIUS = 8;
 // Pixel tolerance for hovering an EEZ line.
 const EEZ_HOVER_RADIUS = 8;
+
+// Satellites are drawn as small green pings floating above the surface.
+const SATELLITE_COLOR = '#22e36a';
+const SATELLITE_ORBIT_COLOR = 'rgba(34, 227, 106, 0.5)';
+const SATELLITE_RADIUS = 2;
+// Vertices used to trace a full orbit circle.
+const ORBIT_SAMPLES = 256;
+const EARTH_RADIUS_KM = 6371;
+// Time acceleration for orbital motion while the globe is spinning: one real
+// second advances the orbits by this many simulated seconds, so a ~97 min LEO
+// orbit completes in a few seconds on screen.
+const SATELLITE_SIM_SPEED = 1000;
 // Pixel tolerance for hovering an event marker.
 const EVENT_HOVER_RADIUS = 11;
 
@@ -184,6 +196,30 @@ interface GlobeCanvasProps {
 }
 
 const EARTH_RADIUS_M = 6_371_000;
+
+/**
+ * Sub-satellite longitude/latitude (degrees) for a circular orbit, from its
+ * orbital elements at argument-of-latitude `uDeg` (measured from the ascending
+ * node). RAAN is treated as an Earth-fixed longitude of the node — good enough
+ * to spread the constellation realistically around the globe.
+ */
+function subSatellitePoint(
+  raanDeg: number,
+  inclinationDeg: number,
+  uDeg: number,
+): [number, number] {
+  const O = (raanDeg * Math.PI) / 180;
+  const i = (inclinationDeg * Math.PI) / 180;
+  const u = (uDeg * Math.PI) / 180;
+  const cu = Math.cos(u);
+  const su = Math.sin(u);
+  const x = Math.cos(O) * cu - Math.sin(O) * su * Math.cos(i);
+  const y = Math.sin(O) * cu + Math.cos(O) * su * Math.cos(i);
+  const z = su * Math.sin(i);
+  const lat = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI;
+  const lon = (Math.atan2(y, x) * 180) / Math.PI;
+  return [lon, lat];
+}
 
 // Point data to overlay on the globe. Any GeoJSON point features work here;
 // coordinates are [longitude, latitude].
@@ -230,12 +266,15 @@ export function GlobeCanvas({
     const pingStore = stores.ping;
     const layerStore = stores.layers;
     const eventStore = stores.event;
+    const satelliteStore = stores.satellite;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
     let width = 0;
     let height = 0;
     let baseRadius = 0;
+    // Accumulated simulated orbital time; only advances while the globe spins.
+    let satClockMs = 0;
 
     // Cursor position (canvas-relative) and the currently hovered ping.
     const mouse = { x: 0, y: 0, inside: false };
@@ -480,6 +519,80 @@ export function GlobeCanvas({
         }
       }
 
+      // Satellite orbits (for satellites whose orbit toggle is on): a full
+      // circle traced at altitude, broken where it passes behind the Earth.
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = SATELLITE_ORBIT_COLOR;
+      for (const sat of satelliteStore.satellites) {
+        if (!satelliteStore.orbitOn.has(sat.name)) continue;
+        const rho = (EARTH_RADIUS_KM + (sat.altitudeKm ?? 0)) / EARTH_RADIUS_KM;
+        ctx.beginPath();
+        let penDown = false;
+        for (let k = 0; k <= ORBIT_SAMPLES; k++) {
+          const u = (360 * k) / ORBIT_SAMPLES;
+          const [lon, lat] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u);
+          const projected = projection([lon, lat]);
+          if (!projected) {
+            penDown = false;
+            continue;
+          }
+          const [sx, sy] = projected;
+          const front = geoDistance([lon, lat], center) <= Math.PI / 2;
+          if (!front && rho * Math.hypot(sx - cx, sy - cy) < radius) {
+            penDown = false; // hidden behind the Earth
+            continue;
+          }
+          const x = cx + rho * (sx - cx);
+          const y = cy + rho * (sy - cy);
+          if (penDown) {
+            ctx.lineTo(x, y);
+          } else {
+            ctx.moveTo(x, y);
+            penDown = true;
+          }
+        }
+        ctx.stroke();
+      }
+
+      // Satellites: green pings floating above the surface, drawn to scale.
+      // They only advance along their orbits while the globe is spinning; the
+      // selected one pulses and glows.
+      const selectedSat = satelliteStore.selectedName;
+      const satPulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
+      for (const sat of satelliteStore.satellites) {
+        const rho = (EARTH_RADIUS_KM + (sat.altitudeKm ?? 0)) / EARTH_RADIUS_KM;
+        const period = sat.orbitalPeriodMin ?? 0;
+        const advanceDeg = period > 0 ? (360 * satClockMs) / (period * 60_000) : 0;
+        const u = (sat.meanAnomalyDeg ?? 0) + advanceDeg;
+        const [lon, lat] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u);
+        const projected = projection([lon, lat]);
+        if (!projected) continue;
+        const [sx, sy] = projected;
+        // Orthographic is a parallel projection: a point at radius ρ projects to
+        // ρ× the surface point's offset from the globe centre.
+        const x = cx + rho * (sx - cx);
+        const y = cy + rho * (sy - cy);
+        // Hide satellites that are behind the Earth and inside its silhouette.
+        const front = geoDistance([lon, lat], center) <= Math.PI / 2;
+        if (!front && rho * Math.hypot(sx - cx, sy - cy) < radius) continue;
+
+        if (sat.name === selectedSat) {
+          ctx.save();
+          ctx.shadowColor = SATELLITE_COLOR;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(x, y, SATELLITE_RADIUS * (1 + 3 * satPulse), 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(34, 227, 106, 0.25)';
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.beginPath();
+        ctx.arc(x, y, SATELLITE_RADIUS, 0, 2 * Math.PI);
+        ctx.fillStyle = SATELLITE_COLOR;
+        ctx.fill();
+      }
+
       // Notify when the hovered ping changes (keyed on mmsi + timestamp so
       // moving between pings of the same track refreshes the tooltip).
       const nextKey = nearest ? `${nearest.mmsi}|${nearest.ts}` : null;
@@ -706,8 +819,10 @@ export function GlobeCanvas({
       const dt = now - last;
       last = now;
       // Pause auto-spin while dragging or hovering a ping so it stays readable.
+      // Satellites advance along their orbits in lockstep with the spin.
       if (globe.spinning && !dragging && hoveredMmsi === null) {
         globe.advanceSpin(dt);
+        satClockMs += dt * SATELLITE_SIM_SPEED;
       }
       if (!dragging) {
         globe.flyStep(dt);

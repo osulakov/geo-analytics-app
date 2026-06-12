@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
-import { colorForMmsi } from '../utils/colorMap';
+import { colorForMmsi } from '../layers_controller/colorMap';
 import { GroupEditModal } from './GroupEditModal';
-import type { StaticVesselInfo } from '../api/vessels';
-import type { VesselGroup } from '../api/groups';
+import type { StaticVesselInfo } from '../data_loaders/vessels';
+import type { VesselGroup } from '../data_loaders/groups';
 
 const PAGE_SIZE = 5;
 

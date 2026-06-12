@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../api/vessels';
+import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
 import { useStores } from '../stores/StoreContext';
 
 interface VesselModalProps {

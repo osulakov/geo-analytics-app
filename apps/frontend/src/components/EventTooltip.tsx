@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import type { MapEvent } from '../api/events';
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../api/vessels';
+import type { MapEvent } from '../data_loaders/events';
+import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
 
 interface EventTooltipProps {
   event: MapEvent;

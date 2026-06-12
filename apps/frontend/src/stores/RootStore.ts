@@ -2,7 +2,7 @@ import { ChatStore } from './ChatStore';
 import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
-import { LayerStore } from './LayerStore';
+import { LayerStore } from '../layers_visibilities/LayerStore';
 import { PingStore } from './PingStore';
 import { SatelliteStore } from './SatelliteStore';
 import { VesselStore } from './VesselStore';

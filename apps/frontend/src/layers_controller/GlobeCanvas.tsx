@@ -11,8 +11,8 @@ import countries110m from 'world-atlas/countries-110m.json';
 import eezUrl from '../assets/eez-simplified.geojson?url';
 import analyticsSquareRaw from '../assets/analytics_square.svg?raw';
 import { useStores } from '../stores/StoreContext';
-import { colorForMmsi, colorForMmsiAlpha } from '../utils/colorMap';
-import type { MapEvent } from '../api/events';
+import { colorForMmsi, colorForMmsiAlpha } from './colorMap';
+import type { MapEvent } from '../data_loaders/events';
 
 // Red geofence-event icon (the square SVG, recolored), drawn on the canvas.
 const GEOFENCE_COLOR = '#ef4444';

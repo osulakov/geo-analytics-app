@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { observer } from 'mobx-react-lite';
 
-import type { VesselGroup } from '../api/groups';
+import type { VesselGroup } from '../data_loaders/groups';
 import { useStores } from '../stores/StoreContext';
-import { colorForMmsi } from '../utils/colorMap';
+import { colorForMmsi } from '../layers_controller/colorMap';
 
 interface GroupEditModalProps {
   group: VesselGroup;

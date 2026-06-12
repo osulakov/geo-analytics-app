@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
-import { fetchStaticVesselInfo, type StaticVesselInfo } from '../api/vessels';
+import { fetchStaticVesselInfo, type StaticVesselInfo } from '../data_loaders/vessels';
 
 /** Holds the full static vessel list for the Vessels widget. */
 export class VesselStore {

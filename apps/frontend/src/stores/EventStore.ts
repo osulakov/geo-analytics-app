@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
-import { fetchGeofenceEvents, type MapEvent } from '../api/events';
-import type { ViewportCap } from '../api/pings';
+import { fetchGeofenceEvents, type MapEvent } from '../data_loaders/events';
+import type { ViewportCap } from '../data_loaders/pings';
 
 function isAbort(error: unknown): boolean {
   return (error as { name?: string } | null)?.name === 'AbortError';

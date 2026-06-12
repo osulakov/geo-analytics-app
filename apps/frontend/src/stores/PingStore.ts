@@ -6,7 +6,7 @@ import {
   type LatestPing,
   type TrackPoint,
   type ViewportCap,
-} from '../api/pings';
+} from '../data_loaders/pings';
 
 /** A ping with its timestamp pre-parsed to ms (avoids per-filter Date.parse). */
 interface TimedPing extends LatestPing {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { fetchVesselByMmsi, type StaticVesselInfo } from '../api/vessels';
+import { fetchVesselByMmsi, type StaticVesselInfo } from '../data_loaders/vessels';
 
 // Cache static info per MMSI so repeated hovers don't re-fetch.
 const cache = new Map<string, StaticVesselInfo | null>();

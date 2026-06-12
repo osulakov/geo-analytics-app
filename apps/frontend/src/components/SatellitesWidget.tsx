@@ -4,7 +4,7 @@ import AnimationIcon from '@mui/icons-material/Animation';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
 
 import { useStores } from '../stores/StoreContext';
-import type { Satellite } from '../api/satellites';
+import type { Satellite } from '../data_loaders/satellites';
 
 const PAGE_SIZE = 5;
 

@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
-import { fetchSatellites, type Satellite } from '../api/satellites';
+import { fetchSatellites, type Satellite } from '../data_loaders/satellites';
 
 /**
  * Holds the satellite list for the Satellites widget, plus per-satellite toggle

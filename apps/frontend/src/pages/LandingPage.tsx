@@ -9,7 +9,7 @@ import {
   type EezHover,
   type EventHover,
   type PingHover,
-} from '../components/GlobeCanvas';
+} from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
 import { SatellitesWidget } from '../components/SatellitesWidget';

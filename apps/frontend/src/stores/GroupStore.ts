@@ -7,7 +7,7 @@ import {
   fetchGroups,
   updateGroupMembers,
   type VesselGroup,
-} from '../api/groups';
+} from '../data_loaders/groups';
 
 /** Vessel groups (create / list / add members). */
 export class GroupStore {

@@ -1652,7 +1652,8 @@ body {
 }
 
 .vessel-tooltip,
-.event-tooltip {
+.event-tooltip,
+.satellite-tooltip {
   position: fixed;
   z-index: 30;
   pointer-events: none;
@@ -1695,14 +1696,16 @@ body {
   text-align: right;
 }
 
-.vessel-tooltip__title {
+.vessel-tooltip__title,
+.satellite-tooltip__title {
   font-size: 12px;
   font-weight: 700;
   color: var(--color-primary);
   margin-bottom: var(--element-gap);
 }
 
-.vessel-tooltip__list {
+.vessel-tooltip__list,
+.satellite-tooltip__list {
   margin: 0;
   display: grid;
   gap: var(--text-gap);
@@ -1710,17 +1713,20 @@ body {
   font-size: 0.8em;
 }
 
-.vessel-tooltip__list > div {
+.vessel-tooltip__list > div,
+.satellite-tooltip__list > div {
   display: flex;
   justify-content: space-between;
   gap: var(--space-8);
 }
 
-.vessel-tooltip__list dt {
+.vessel-tooltip__list dt,
+.satellite-tooltip__list dt {
   opacity: 0.55;
 }
 
-.vessel-tooltip__list dd {
+.vessel-tooltip__list dd,
+.satellite-tooltip__list dd {
   margin: 0;
   text-align: right;
 }
@@ -1739,6 +1745,7 @@ body {
 .group-edit,
 .confirm-dialog,
 .vessel-tooltip,
+.satellite-tooltip,
 .eez-tooltip {
   box-shadow: var(--widget-glow);
 }

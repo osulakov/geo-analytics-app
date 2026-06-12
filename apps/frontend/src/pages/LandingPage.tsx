@@ -9,10 +9,12 @@ import {
   type EezHover,
   type EventHover,
   type PingHover,
+  type SatelliteHover,
 } from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
+import { SatelliteTooltip } from '../components/SatelliteTooltip';
 import { SatellitesWidget } from '../components/SatellitesWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
@@ -26,6 +28,7 @@ export function LandingPage() {
   const [hover, setHover] = useState<PingHover | null>(null);
   const [eezHover, setEezHover] = useState<EezHover | null>(null);
   const [eventHover, setEventHover] = useState<EventHover | null>(null);
+  const [satHover, setSatHover] = useState<SatelliteHover | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +81,7 @@ export function LandingPage() {
         onHover={setHover}
         onEezHover={setEezHover}
         onEventHover={setEventHover}
+        onSatelliteHover={setSatHover}
         onSelect={handleSelect}
         onViewportChange={handleViewport}
       />
@@ -97,7 +101,15 @@ export function LandingPage() {
         <LayersWidget />
         <ChatWidget />
       </div>
-      {hover && !selected && (
+      {satHover && !selected && (
+        <SatelliteTooltip
+          satellite={satHover.satellite}
+          area={satHover.area}
+          x={satHover.x}
+          y={satHover.y}
+        />
+      )}
+      {hover && !satHover && !selected && (
         <VesselTooltip
           mmsi={hover.mmsi}
           x={hover.x}
@@ -106,10 +118,10 @@ export function LandingPage() {
           heading={hover.heading}
         />
       )}
-      {eventHover && !hover && !selected && (
+      {eventHover && !satHover && !hover && !selected && (
         <EventTooltip event={eventHover.event} x={eventHover.x} y={eventHover.y} />
       )}
-      {eezHover && !hover && !eventHover && !selected && (
+      {eezHover && !satHover && !hover && !eventHover && !selected && (
         <div className="eez-tooltip" style={{ left: eezHover.x + 14, top: eezHover.y + 14 }}>
           {eezHover.name}
         </div>

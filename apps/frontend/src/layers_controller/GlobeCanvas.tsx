@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { geoDistance, geoGraticule10, geoOrthographic, geoPath } from 'd3-geo';
 import { feature, mesh } from 'topojson-client';
-import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
+import type { Feature, FeatureCollection, Point } from 'geojson';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 
 import countries110m from 'world-atlas/countries-110m.json';
@@ -13,6 +13,7 @@ import analyticsSquareRaw from '../assets/analytics_square.svg?raw';
 import { useStores } from '../stores/StoreContext';
 import { colorForMmsi, colorForMmsiAlpha } from './colorMap';
 import type { MapEvent } from '../data_loaders/events';
+import type { Satellite } from '../data_loaders/satellites';
 
 // Red geofence-event icon (the square SVG, recolored), drawn on the canvas.
 const GEOFENCE_COLOR = '#ef4444';
@@ -156,7 +157,22 @@ const ORBIT_SAMPLES = 256;
 const COVERAGE_LENGTH_KM = 360;
 const COVERAGE_DEFAULT_WIDTH_KM = 13;
 const COVERAGE_FILL = 'rgba(34, 227, 106, 0.22)';
-const COVERAGE_STROKE = 'rgba(34, 227, 106, 0.7)';
+const COVERAGE_STROKE = 'rgba(34, 227, 106, 0.5)';
+// Pixel tolerance for hovering a satellite ping.
+const SATELLITE_HOVER_RADIUS = 8;
+
+/** Even-odd point-in-polygon test in screen space. */
+function pointInPolygon(px: number, py: number, pts: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
 const EARTH_RADIUS_KM = 6371;
 // Pixel tolerance for hovering an event marker.
 const EVENT_HOVER_RADIUS = 11;
@@ -184,6 +200,15 @@ export interface EventHover {
   y: number;
 }
 
+/** A satellite (ping or its coverage strip) under the cursor. */
+export interface SatelliteHover {
+  satellite: Satellite;
+  /** Footprint area in km² when hovering the coverage strip; null for the ping. */
+  area: number | null;
+  x: number;
+  y: number;
+}
+
 interface GlobeCanvasProps {
   /** Called when the hovered ping changes (null when nothing is hovered). */
   onHover?: (hover: PingHover | null) => void;
@@ -191,6 +216,8 @@ interface GlobeCanvasProps {
   onEezHover?: (hover: EezHover | null) => void;
   /** Called when the hovered event marker changes. */
   onEventHover?: (hover: EventHover | null) => void;
+  /** Called when the hovered satellite (ping or coverage strip) changes. */
+  onSatelliteHover?: (hover: SatelliteHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
   /** Called (throttled, after the view settles) with the visible cap. */
@@ -267,6 +294,7 @@ export function GlobeCanvas({
   onHover,
   onEezHover,
   onEventHover,
+  onSatelliteHover,
   onSelect,
   onViewportChange,
 }: GlobeCanvasProps) {
@@ -281,6 +309,8 @@ export function GlobeCanvas({
   onEezHoverRef.current = onEezHover;
   const onEventHoverRef = useRef(onEventHover);
   onEventHoverRef.current = onEventHover;
+  const onSatelliteHoverRef = useRef(onSatelliteHover);
+  onSatelliteHoverRef.current = onSatelliteHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onViewportChangeRef = useRef(onViewportChange);
@@ -318,6 +348,8 @@ export function GlobeCanvas({
     let eezHoveredName: string | null = null;
     // Identity of the hovered event marker (for change detection).
     let eventHoveredKey: string | null = null;
+    // Identity of the hovered satellite (name + ping/coverage, for change detection).
+    let satHoveredKey: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -551,15 +583,21 @@ export function GlobeCanvas({
         }
       }
 
-      // Capture-coverage strips: for satellites with the coverage toggle on,
-      // a semitransparent ground footprint under the satellite, aligned with
-      // its ground track and moving with it. d3 clips it at the horizon.
+      // Capture-coverage strips: for satellites with the coverage toggle on, a
+      // semitransparent ground footprint under the satellite, aligned with its
+      // ground track and moving with it. Drawn as a planar quad from the four
+      // projected corners (a spherical polygon fill is winding-sensitive and
+      // can invert to cover the whole globe), skipped when on the far side.
+      ctx.lineWidth = 1;
+      let coverageHover: SatelliteHover | null = null;
       for (const sat of satelliteStore.satellites) {
         if (!satelliteStore.chasingOn.has(sat.name)) continue;
         const period = sat.orbitalPeriodMin ?? 0;
         const advanceDeg = period > 0 ? (360 * satClockMs) / (period * 60_000) : 0;
         const u = (sat.meanAnomalyDeg ?? 0) + advanceDeg;
         const [lon0, lat0] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u);
+        // Footprint centre on the far hemisphere → hidden behind the Earth.
+        if (geoDistance([lon0, lat0], center) > Math.PI / 2) continue;
         // Heading from a point a little further along the orbit.
         const [lon1, lat1] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u + 0.2);
         const heading = initialBearing(lat0, lon0, lat1, lon1);
@@ -567,25 +605,31 @@ export function GlobeCanvas({
         const halfWid = (sat.swathWidthKm ?? COVERAGE_DEFAULT_WIDTH_KM) / 2;
         const [fLon, fLat] = destinationPoint(lat0, lon0, heading, halfLen);
         const [bLon, bLat] = destinationPoint(lat0, lon0, heading + 180, halfLen);
-        const coverage: Polygon = {
-          type: 'Polygon',
-          coordinates: [
-            [
-              destinationPoint(fLat, fLon, heading + 90, halfWid),
-              destinationPoint(fLat, fLon, heading - 90, halfWid),
-              destinationPoint(bLat, bLon, heading - 90, halfWid),
-              destinationPoint(bLat, bLon, heading + 90, halfWid),
-              destinationPoint(fLat, fLon, heading + 90, halfWid),
-            ],
-          ],
-        };
+        const corners = [
+          destinationPoint(fLat, fLon, heading + 90, halfWid),
+          destinationPoint(fLat, fLon, heading - 90, halfWid),
+          destinationPoint(bLat, bLon, heading - 90, halfWid),
+          destinationPoint(bLat, bLon, heading + 90, halfWid),
+        ];
+        const screen: [number, number][] = [];
+        for (const [clon, clat] of corners) {
+          const p = projection([clon, clat]);
+          if (p) screen.push([p[0], p[1]]);
+        }
+        if (screen.length < 3) continue;
         ctx.beginPath();
-        path(coverage);
+        ctx.moveTo(screen[0][0], screen[0][1]);
+        for (let i = 1; i < screen.length; i++) ctx.lineTo(screen[i][0], screen[i][1]);
+        ctx.closePath();
         ctx.fillStyle = COVERAGE_FILL;
         ctx.fill();
-        ctx.lineWidth = 1;
         ctx.strokeStyle = COVERAGE_STROKE;
         ctx.stroke();
+
+        if (checkHover && !coverageHover && pointInPolygon(mouse.x, mouse.y, screen)) {
+          const area = (sat.swathWidthKm ?? COVERAGE_DEFAULT_WIDTH_KM) * COVERAGE_LENGTH_KM;
+          coverageHover = { satellite: sat, area, x: mouse.x, y: mouse.y };
+        }
       }
 
       // Satellite orbits (for satellites whose orbit toggle is on): a full
@@ -628,6 +672,8 @@ export function GlobeCanvas({
       // selected one pulses and glows.
       const selectedSat = satelliteStore.selectedName;
       const satPulse = (1 - Math.cos(((performance.now() % 1000) / 1000) * 2 * Math.PI)) / 2;
+      let nearestSatHover: SatelliteHover | null = null;
+      let nearestSatDist2 = SATELLITE_HOVER_RADIUS * SATELLITE_HOVER_RADIUS;
       for (const sat of satelliteStore.satellites) {
         const rho = (EARTH_RADIUS_KM + (sat.altitudeKm ?? 0)) / EARTH_RADIUS_KM;
         const period = sat.orbitalPeriodMin ?? 0;
@@ -660,6 +706,26 @@ export function GlobeCanvas({
         ctx.arc(x, y, SATELLITE_RADIUS, 0, 2 * Math.PI);
         ctx.fillStyle = SATELLITE_COLOR;
         ctx.fill();
+
+        if (checkHover) {
+          const dx = x - mouse.x;
+          const dy = y - mouse.y;
+          const dist2 = dx * dx + dy * dy;
+          if (dist2 < nearestSatDist2) {
+            nearestSatDist2 = dist2;
+            nearestSatHover = { satellite: sat, area: null, x, y };
+          }
+        }
+      }
+
+      // Satellite hover: a ping wins over a coverage strip. Emit on change.
+      const satHover = nearestSatHover ?? coverageHover;
+      const nextSatKey = satHover
+        ? `${satHover.satellite.name}|${satHover.area == null ? 'ping' : 'cov'}`
+        : null;
+      if (nextSatKey !== satHoveredKey) {
+        satHoveredKey = nextSatKey;
+        onSatelliteHoverRef.current?.(satHover);
       }
 
       // Notify when the hovered ping changes (keyed on mmsi + timestamp so
@@ -757,8 +823,9 @@ export function GlobeCanvas({
       didDrag = false;
       // Remember the ping under the cursor for click-to-select.
       pressedMmsi = hoveredMmsi;
-      // Pause auto-spin / cancel any fly-to while grabbing, and drop hover.
-      globe.setSpinning(false);
+      // Cancel any fly-to while grabbing, and drop hover. Auto-spin is left on
+      // — it just pauses for the duration of the drag (see the tick) and
+      // resumes on release, so grabbing the globe never stops the animation.
       globe.cancelFlight();
       clearHover();
       canvas.setPointerCapture(event.pointerId);

@@ -17,11 +17,17 @@ function clamp(value: number, min: number, max: number): number {
  * handlers mutate them through the actions below.
  */
 export class GlobeStore {
-  /** Auto-rotation speed in revolutions per minute. */
-  rpm = 1;
+  /**
+   * Auto-rotation speed in revolutions per minute. Real time at speed 1×: one
+   * full rotation per 24 h (1440 min), i.e. the Earth's actual rotation rate.
+   */
+  rpm = 1 / 1440;
 
   /** Whether the globe is auto-rotating. */
   spinning = false;
+
+  /** Playback speed multiplier for spin + satellite motion (1, 2, 5, 10). */
+  speed = 1;
 
   /** Scale multiplier applied to the base projection radius. */
   zoom = 1;
@@ -129,6 +135,10 @@ export class GlobeStore {
 
   setRpm(rpm: number): void {
     this.rpm = rpm;
+  }
+
+  setSpeed(speed: number): void {
+    this.speed = speed;
   }
 
   setZoom(zoom: number): void {

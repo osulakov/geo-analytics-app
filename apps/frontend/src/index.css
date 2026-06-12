@@ -147,6 +147,72 @@ body {
   letter-spacing: 0.04em;
 }
 
+/* Play button wrapper: holds the main button, the speed chevron, and menu. */
+.globe-controls__play {
+  position: relative;
+  width: 36px;
+  height: 36px;
+}
+
+.globe-controls button.globe-controls__play-speed {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
+.globe-controls .globe-controls__play-chevron {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 0 0 var(--element-radius) 0;
+  background: transparent;
+  backdrop-filter: none;
+  opacity: 0.7;
+}
+
+.globe-controls .globe-controls__play-chevron:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--surface-control-hover);
+}
+
+.globe-controls__speed-menu {
+  position: absolute;
+  right: calc(100% + var(--element-gap));
+  bottom: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-control);
+  border-radius: var(--element-radius);
+  backdrop-filter: var(--blur-control);
+  box-shadow: var(--widget-glow);
+}
+
+.globe-controls .globe-controls__speed-menu button {
+  width: auto;
+  height: auto;
+  justify-content: flex-start;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  font-size: 12px;
+  white-space: nowrap;
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: var(--radius-xs);
+}
+
+.globe-controls .globe-controls__speed-menu button:hover {
+  background: var(--surface-control-hover);
+}
+
+.globe-controls .globe-controls__speed-menu button.is-active {
+  background: var(--accent-soft);
+}
+
 .left-stack {
   position: fixed;
   top: 20px;

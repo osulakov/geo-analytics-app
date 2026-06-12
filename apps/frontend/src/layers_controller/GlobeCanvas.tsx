@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { geoDistance, geoGraticule10, geoOrthographic, geoPath } from 'd3-geo';
 import { feature, mesh } from 'topojson-client';
-import type { Feature, FeatureCollection, Point } from 'geojson';
+import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 
 import countries110m from 'world-atlas/countries-110m.json';
@@ -151,11 +151,13 @@ const SATELLITE_ORBIT_COLOR = 'rgba(34, 227, 106, 0.5)';
 const SATELLITE_RADIUS = 2;
 // Vertices used to trace a full orbit circle.
 const ORBIT_SAMPLES = 256;
+// Capture-coverage strip on the ground, ~13 km × 360 km. Width falls back to
+// this when a satellite has no swath recorded.
+const COVERAGE_LENGTH_KM = 360;
+const COVERAGE_DEFAULT_WIDTH_KM = 13;
+const COVERAGE_FILL = 'rgba(34, 227, 106, 0.22)';
+const COVERAGE_STROKE = 'rgba(34, 227, 106, 0.7)';
 const EARTH_RADIUS_KM = 6371;
-// Time acceleration for orbital motion while the globe is spinning: one real
-// second advances the orbits by this many simulated seconds, so a ~97 min LEO
-// orbit completes in a few seconds on screen.
-const SATELLITE_SIM_SPEED = 1000;
 // Pixel tolerance for hovering an event marker.
 const EVENT_HOVER_RADIUS = 11;
 
@@ -219,6 +221,36 @@ function subSatellitePoint(
   const lat = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI;
   const lon = (Math.atan2(y, x) * 180) / Math.PI;
   return [lon, lat];
+}
+
+const D2R = Math.PI / 180;
+const R2D = 180 / Math.PI;
+
+/** Initial bearing (degrees) from point 1 to point 2 on the sphere. */
+function initialBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const f1 = lat1 * D2R;
+  const f2 = lat2 * D2R;
+  const dl = (lon2 - lon1) * D2R;
+  const y = Math.sin(dl) * Math.cos(f2);
+  const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+  return Math.atan2(y, x) * R2D;
+}
+
+/** Point [lon, lat] reached from (lat, lon) going `distKm` along `bearingDeg`. */
+function destinationPoint(
+  latDeg: number,
+  lonDeg: number,
+  bearingDeg: number,
+  distKm: number,
+): [number, number] {
+  const d = distKm / EARTH_RADIUS_KM;
+  const t = bearingDeg * D2R;
+  const f1 = latDeg * D2R;
+  const l1 = lonDeg * D2R;
+  const sinF2 = Math.sin(f1) * Math.cos(d) + Math.cos(f1) * Math.sin(d) * Math.cos(t);
+  const f2 = Math.asin(Math.max(-1, Math.min(1, sinF2)));
+  const l2 = l1 + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(f1), Math.cos(d) - Math.sin(f1) * sinF2);
+  return [(((l2 * R2D + 540) % 360) - 180), f2 * R2D];
 }
 
 // Point data to overlay on the globe. Any GeoJSON point features work here;
@@ -517,6 +549,43 @@ export function GlobeCanvas({
             }
           }
         }
+      }
+
+      // Capture-coverage strips: for satellites with the coverage toggle on,
+      // a semitransparent ground footprint under the satellite, aligned with
+      // its ground track and moving with it. d3 clips it at the horizon.
+      for (const sat of satelliteStore.satellites) {
+        if (!satelliteStore.chasingOn.has(sat.name)) continue;
+        const period = sat.orbitalPeriodMin ?? 0;
+        const advanceDeg = period > 0 ? (360 * satClockMs) / (period * 60_000) : 0;
+        const u = (sat.meanAnomalyDeg ?? 0) + advanceDeg;
+        const [lon0, lat0] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u);
+        // Heading from a point a little further along the orbit.
+        const [lon1, lat1] = subSatellitePoint(sat.raanDeg ?? 0, sat.inclinationDeg ?? 0, u + 0.2);
+        const heading = initialBearing(lat0, lon0, lat1, lon1);
+        const halfLen = COVERAGE_LENGTH_KM / 2;
+        const halfWid = (sat.swathWidthKm ?? COVERAGE_DEFAULT_WIDTH_KM) / 2;
+        const [fLon, fLat] = destinationPoint(lat0, lon0, heading, halfLen);
+        const [bLon, bLat] = destinationPoint(lat0, lon0, heading + 180, halfLen);
+        const coverage: Polygon = {
+          type: 'Polygon',
+          coordinates: [
+            [
+              destinationPoint(fLat, fLon, heading + 90, halfWid),
+              destinationPoint(fLat, fLon, heading - 90, halfWid),
+              destinationPoint(bLat, bLon, heading - 90, halfWid),
+              destinationPoint(bLat, bLon, heading + 90, halfWid),
+              destinationPoint(fLat, fLon, heading + 90, halfWid),
+            ],
+          ],
+        };
+        ctx.beginPath();
+        path(coverage);
+        ctx.fillStyle = COVERAGE_FILL;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = COVERAGE_STROKE;
+        ctx.stroke();
       }
 
       // Satellite orbits (for satellites whose orbit toggle is on): a full
@@ -819,10 +888,13 @@ export function GlobeCanvas({
       const dt = now - last;
       last = now;
       // Pause auto-spin while dragging or hovering a ping so it stays readable.
-      // Satellites advance along their orbits in lockstep with the spin.
+      // Earth rotation and satellite orbits share one real-time clock (real
+      // time at 1×); the playback speed multiplier scales both equally, so
+      // their relative rates stay physically correct.
       if (globe.spinning && !dragging && hoveredMmsi === null) {
-        globe.advanceSpin(dt);
-        satClockMs += dt * SATELLITE_SIM_SPEED;
+        const scaled = dt * (globe.speed || 1);
+        globe.advanceSpin(scaled);
+        satClockMs += scaled;
       }
       if (!dragging) {
         globe.flyStep(dt);

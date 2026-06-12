@@ -1,6 +1,15 @@
+import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
+
+// Playback speeds for the spin + satellite motion.
+const SPEEDS: { value: number; label: string }[] = [
+  { value: 1, label: 'Normal' },
+  { value: 10, label: '›› 10×' },
+  { value: 50, label: '››› 50×' },
+  { value: 100, label: '›››› 100×' },
+];
 
 /**
  * Small control cluster, bottom-right of the screen: zoom in/out, pause/resume
@@ -8,6 +17,15 @@ import { useStores } from '../stores/StoreContext';
  */
 export const GlobeControls = observer(function GlobeControls() {
   const { globe } = useStores();
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+
+  // Close the speed menu on any click outside the play control.
+  useEffect(() => {
+    if (!speedMenuOpen) return;
+    const close = () => setSpeedMenuOpen(false);
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [speedMenuOpen]);
 
   return (
     <div className="globe-controls">
@@ -67,14 +85,59 @@ export const GlobeControls = observer(function GlobeControls() {
       >
         EEZ
       </button>
-      <button
-        type="button"
-        title={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
-        aria-label={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
-        onClick={() => globe.toggleSpinning()}
-      >
-        {globe.spinning ? '❚❚' : '▶'}
-      </button>
+      <div className="globe-controls__play" onPointerDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className={globe.spinning ? 'globe-controls__play-speed' : undefined}
+          title={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
+          aria-label={globe.spinning ? 'Pause rotation' : 'Resume rotation'}
+          onClick={() => globe.toggleSpinning()}
+        >
+          {globe.spinning ? `${globe.speed}×` : '▶'}
+        </button>
+        <button
+          type="button"
+          className="globe-controls__play-chevron"
+          title={`Playback speed (${SPEEDS.find((s) => s.value === globe.speed)?.label ?? 'Normal'})`}
+          aria-label="Playback speed"
+          aria-haspopup="menu"
+          aria-expanded={speedMenuOpen}
+          onClick={() => setSpeedMenuOpen((o) => !o)}
+        >
+          <svg
+            width="8"
+            height="8"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        {speedMenuOpen && (
+          <div className="globe-controls__speed-menu" role="menu">
+            {SPEEDS.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={globe.speed === s.value}
+                className={globe.speed === s.value ? 'is-active' : undefined}
+                onClick={() => {
+                  globe.setSpeed(s.value);
+                  setSpeedMenuOpen(false);
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <button
         type="button"
         title="Reset view"

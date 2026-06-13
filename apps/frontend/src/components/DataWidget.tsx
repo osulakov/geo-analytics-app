@@ -101,11 +101,11 @@ const SatelliteRow = observer(function SatelliteRow({ sat }: { sat: Satellite })
 });
 
 /**
- * Right-side widget listing satellites from the DB. Collapsed by default
- * (title + search); expands on typing or via the chevron. Mirrors the layout
- * of the Vessels widget.
+ * Right-side "Data" widget. Collapsed by default (title + search); expands on
+ * typing or via the chevron. Currently contains a Satellites section; more data
+ * sections can be added below it. Mirrors the layout of the Vessels widget.
  */
-export const SatellitesWidget = observer(function SatellitesWidget() {
+export const DataWidget = observer(function DataWidget() {
   const { satellite } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
@@ -131,84 +131,79 @@ export const SatellitesWidget = observer(function SatellitesWidget() {
   };
 
   return (
-    <div className={`satellites-widget${expanded ? '' : ' is-collapsed'}`}>
-      <div className="satellites-widget__header">
-        <button
-          type="button"
-          className="satellites-widget__title"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
+    <div className={`data-widget${expanded ? '' : ' is-collapsed'}`}>
+      <button
+        type="button"
+        className="data-widget__header"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        <span className="data-widget__title">Data</span>
+        <svg
+          className="data-widget__chevron"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
         >
-          Satellites
-        </button>
-        <button
-          type="button"
-          className={`satellite-row__icon${satellite.anyOrbitOn ? ' is-active' : ''}`}
-          title={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
-          aria-label={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
-          aria-pressed={satellite.anyOrbitOn}
-          onClick={() => satellite.toggleAllOrbits()}
-        >
-          <AnimationIcon fontSize="inherit" />
-        </button>
-        <button
-          type="button"
-          className={`satellite-row__icon${satellite.visible ? ' is-active' : ''}`}
-          title={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
-          aria-label={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
-          aria-pressed={satellite.visible}
-          onClick={() => satellite.toggleVisible()}
-        >
-          {satellite.visible ? (
-            <VisibilityIcon fontSize="inherit" />
-          ) : (
-            <VisibilityOffIcon fontSize="inherit" />
-          )}
-        </button>
-        <button
-          type="button"
-          className="satellites-widget__chevron-btn"
-          onClick={() => setExpanded((value) => !value)}
-          aria-label={expanded ? 'Collapse list' : 'Expand list'}
-        >
-          <svg
-            className="satellites-widget__chevron"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-      </div>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
 
-      <div className="satellites-widget__search">
+      <div className="data-widget__search">
         <input
           type="text"
           value={query}
           onChange={(event) => handleSearch(event.target.value)}
-          placeholder="Search satellites"
-          aria-label="Search satellites"
+          placeholder="Search data"
+          aria-label="Search data"
         />
       </div>
 
       {expanded && (
         <>
-          <div className="satellites-widget__list">
+          <div className="data-widget__section-header">
+            <span className="data-widget__section-title">Satellites</span>
+            <button
+              type="button"
+              className={`satellite-row__icon${satellite.anyOrbitOn ? ' is-active' : ''}`}
+              title={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+              aria-label={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+              aria-pressed={satellite.anyOrbitOn}
+              onClick={() => satellite.toggleAllOrbits()}
+            >
+              <AnimationIcon fontSize="inherit" />
+            </button>
+            <button
+              type="button"
+              className={`satellite-row__icon${satellite.visible ? ' is-active' : ''}`}
+              title={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+              aria-label={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+              aria-pressed={satellite.visible}
+              onClick={() => satellite.toggleVisible()}
+            >
+              {satellite.visible ? (
+                <VisibilityIcon fontSize="inherit" />
+              ) : (
+                <VisibilityOffIcon fontSize="inherit" />
+              )}
+            </button>
+          </div>
+
+          <div className="data-widget__list">
             {pageItems.length === 0 ? (
-              <div className="satellites-widget__empty">No satellites found</div>
+              <div className="data-widget__empty">No satellites found</div>
             ) : (
               pageItems.map((sat) => <SatelliteRow key={sat.name} sat={sat} />)
             )}
           </div>
 
-          <div className="satellites-widget__pager">
+          <div className="data-widget__pager">
             <button
               type="button"
               aria-label="Previous page"
@@ -219,7 +214,7 @@ export const SatellitesWidget = observer(function SatellitesWidget() {
             </button>
             <span>
               {currentPage + 1} / {pageCount}
-              <span className="satellites-widget__count"> · {filtered.length}</span>
+              <span className="data-widget__count"> · {filtered.length}</span>
             </span>
             <button
               type="button"

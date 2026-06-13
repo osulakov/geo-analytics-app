@@ -17,7 +17,7 @@ import { GlobeControls } from '../components/GlobeControls';
 import { LayersWidget } from '../components/LayersWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
 import { SatelliteTooltip } from '../layers_controller/SatelliteTooltip';
-import { SatellitesWidget } from '../components/SatellitesWidget';
+import { DataWidget } from '../components/DataWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
 import { VesselModal } from '../components/VesselModal';
@@ -102,11 +102,13 @@ export function ExplorePage() {
           <SatelliteCounter />
           <EventCounter />
         </div>
-        <SatellitesWidget />
+        <DataWidget />
       </div>
       <div className="left-stack">
         <Brand />
+        <div className="stack-title stack-title--setup">Setup</div>
         <DateRangeWidget />
+        <div className="stack-title stack-title--results">Results</div>
         <VesselsWidget />
         <LayersWidget />
       </div>

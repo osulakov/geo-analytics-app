@@ -27,6 +27,10 @@ geofenceIcon.src =
   'data:image/svg+xml;charset=utf-8,' +
   encodeURIComponent(analyticsSquareRaw.replace(/currentColor/g, GEOFENCE_COLOR));
 
+// AIS-off (gap) events: orange upward triangle drawn directly on the canvas.
+const AIS_OFF_COLOR = '#ef6a20';
+const AIS_OFF_SIZE = 14;
+
 // Pre-compute the geometry once at module load — it never changes.
 const topology = countries110m as unknown as Topology;
 const countriesObject = topology.objects.countries as GeometryCollection;
@@ -572,11 +576,14 @@ export function GlobeCanvas({
         }
       }
 
-      // Geofence enter/exit events: fixed-size red square icons.
+      // Event markers (geofence squares + AIS-off triangles) share one nearest
+      // hit-test so the tooltip picks whichever is closest to the cursor.
       let nearestEvent: EventHover | null = null;
+      let nearestEventDist2 = EVENT_HOVER_RADIUS * EVENT_HOVER_RADIUS;
+
+      // Geofence enter/exit events: fixed-size red square icons.
       if (layerStore.geofenceVisible && geofenceIconReady) {
         const half = GEOFENCE_ICON_SIZE / 2;
-        let nearestEventDist2 = EVENT_HOVER_RADIUS * EVENT_HOVER_RADIUS;
         for (const ev of eventStore.geofence) {
           const et = Date.parse(ev.ts);
           if (et < winStart || et > winEnd) continue;
@@ -586,6 +593,38 @@ export function GlobeCanvas({
           if (!projected) continue;
           const [x, y] = projected;
           ctx.drawImage(geofenceIcon, x - half, y - half, GEOFENCE_ICON_SIZE, GEOFENCE_ICON_SIZE);
+
+          if (checkHover) {
+            const dx = x - mouse.x;
+            const dy = y - mouse.y;
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < nearestEventDist2) {
+              nearestEventDist2 = dist2;
+              nearestEvent = { event: ev, x, y };
+            }
+          }
+        }
+      }
+
+      // AIS-off (gap) events: fixed-size orange triangles.
+      if (layerStore.aisOffVisible) {
+        const s = AIS_OFF_SIZE;
+        for (const ev of eventStore.aisOff) {
+          const et = Date.parse(ev.ts);
+          if (et < winStart || et > winEnd) continue;
+          const coordinates: [number, number] = [ev.lon, ev.lat];
+          if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+          const projected = projection(coordinates);
+          if (!projected) continue;
+          const [x, y] = projected;
+          ctx.beginPath();
+          ctx.moveTo(x, y - s * 0.6);
+          ctx.lineTo(x - s * 0.55, y + s * 0.45);
+          ctx.lineTo(x + s * 0.55, y + s * 0.45);
+          ctx.closePath();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = AIS_OFF_COLOR;
+          ctx.stroke();
 
           if (checkHover) {
             const dx = x - mouse.x;

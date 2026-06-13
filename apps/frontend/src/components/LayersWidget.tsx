@@ -8,6 +8,7 @@ import triangleIcon from '../assets/analytics_triangle.svg?raw';
 // (matching the red geofence marker on the map).
 const DEVICE_TRACKS_COLOR = '#facc15';
 const GEOFENCE_COLOR = '#ef4444';
+const AIS_OFF_COLOR = '#ef6a20';
 
 interface ToggleProps {
   on: boolean;
@@ -106,6 +107,20 @@ export const LayersWidget = observer(function LayersWidget() {
             on={layers.geofenceVisible}
             onChange={() => layers.toggleGeofence()}
             label="Toggle Geofence events layer"
+          />
+        </div>
+      </div>
+
+      <div className="layer">
+        <div className="layer__header">
+          <span className="layer__leaf">
+            <LayerIcon svg={triangleIcon} color={AIS_OFF_COLOR} />
+            <span className="layer__name">AIS Off</span>
+          </span>
+          <Toggle
+            on={layers.aisOffVisible}
+            onChange={() => layers.toggleAisOff()}
+            label="Toggle AIS-off events layer"
           />
         </div>
       </div>

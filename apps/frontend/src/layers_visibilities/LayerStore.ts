@@ -15,6 +15,9 @@ export class LayerStore {
   /** Geofence enter/exit event markers. */
   geofenceVisible = false;
 
+  /** AIS-off (gap) event markers. */
+  aisOffVisible = false;
+
   constructor() {
     makeAutoObservable(this);
   }
@@ -43,5 +46,9 @@ export class LayerStore {
 
   toggleGeofence(): void {
     this.geofenceVisible = !this.geofenceVisible;
+  }
+
+  toggleAisOff(): void {
+    this.aisOffVisible = !this.aisOffVisible;
   }
 }

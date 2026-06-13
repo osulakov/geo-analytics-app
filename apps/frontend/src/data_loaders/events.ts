@@ -11,8 +11,12 @@ export interface MapEvent {
 
 import { applyCap, type ViewportCap } from './pings';
 
-/** Fetch geofence enter/exit events within an ISO datetime range + viewport. */
-export async function fetchGeofenceEvents(
+/**
+ * Fetch ALL analytics events within an ISO datetime range + viewport cap, in a
+ * single call. The caller splits them by `eventType` (geofence_enter_exit,
+ * ais_off, …) for rendering.
+ */
+export async function fetchEvents(
   fromIso?: string,
   toIso?: string,
   cap?: ViewportCap | null,
@@ -24,9 +28,9 @@ export async function fetchGeofenceEvents(
   applyCap(params, cap);
   const query = params.toString();
 
-  const response = await fetch(`/api/events/geofence${query ? `?${query}` : ''}`, { signal });
+  const response = await fetch(`/api/events${query ? `?${query}` : ''}`, { signal });
   if (!response.ok) {
-    throw new Error(`Failed to fetch geofence events: ${response.status}`);
+    throw new Error(`Failed to fetch events: ${response.status}`);
   }
   return (await response.json()) as MapEvent[];
 }

@@ -493,7 +493,9 @@ export function vesselsApiPlugin(): Plugin {
             return;
           }
 
-          if (pathname === '/events/geofence') {
+          // Single events endpoint: /events → every event_type within the
+          // range + viewport cap. The UI splits the result by `eventType`.
+          if (pathname === '/events') {
             // The events table is produced by analyses_scripts; return [] if it
             // hasn't been created yet.
             const reg = await getPool().query("SELECT to_regclass('public.events') AS t");
@@ -502,7 +504,7 @@ export function vesselsApiPlugin(): Plugin {
               return;
             }
 
-            const conditions = ["event_type = 'geofence_enter_exit'"];
+            const conditions: string[] = [];
             const values: string[] = [];
             const from = url.searchParams.get('from');
             const to = url.searchParams.get('to');
@@ -517,12 +519,13 @@ export function vesselsApiPlugin(): Plugin {
             const cap = capCondition(url, values);
             if (cap) conditions.push(cap);
 
+            const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
             const { rows } = await getPool().query(
               `SELECT mmsi, event_type, subtype, ts, details,
                       ST_X(position::geometry) AS lon,
                       ST_Y(position::geometry) AS lat
                  FROM events
-                WHERE ${conditions.join(' AND ')}
+                ${where}
                 ORDER BY ts`,
               values,
             );

@@ -14,6 +14,14 @@ export default defineConfig({
         target: process.env.BACKEND_URL ?? 'http://localhost:4000',
         changeOrigin: true,
       },
+      '/aois': {
+        target: process.env.BACKEND_URL ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/jobs': {
+        target: process.env.BACKEND_URL ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
 });

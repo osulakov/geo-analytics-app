@@ -1,14 +1,15 @@
 import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
+import { ANALYSES } from '../analyses_configs';
+import type { LayerIconShape } from '../analyses_configs/types';
 import squareIcon from '../assets/analytics_square.svg?raw';
 import triangleIcon from '../assets/analytics_triangle.svg?raw';
 
-// Legend colors: device tracks → yellow triangle, geofence → red square
-// (matching the red geofence marker on the map).
-const DEVICE_TRACKS_COLOR = '#facc15';
-const GEOFENCE_COLOR = '#ef4444';
-const AIS_OFF_COLOR = '#ef6a20';
+const ICON_SVG: Record<LayerIconShape, string> = {
+  square: squareIcon,
+  triangle: triangleIcon,
+};
 
 interface ToggleProps {
   on: boolean;
@@ -43,87 +44,39 @@ function LayerIcon({ svg, color }: { svg: string; color: string }) {
   );
 }
 
-/** Toggles for all map layers. Currently: Device tracks → pings sublayer. */
+/**
+ * One toggle row per map layer. The list is built entirely from the analyses'
+ * `layers_config` — no layer is shown that isn't declared by a config.
+ */
 export const LayersWidget = observer(function LayersWidget() {
   const { layers } = useStores();
+  const layerConfigs = ANALYSES.flatMap((analysis) => analysis.layers_config);
 
   return (
     <div className="layers-widget">
       <div className="layers-widget__title">Layers</div>
 
-      <div className="layer">
-        <div className="layer__header">
-          <button
-            type="button"
-            className="layer__expand"
-            aria-expanded={layers.deviceTracksExpanded}
-            onClick={() => layers.toggleDeviceTracksExpanded()}
-          >
-            <svg
-              className={`layer__chevron${layers.deviceTracksExpanded ? ' is-open' : ''}`}
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-            <LayerIcon svg={triangleIcon} color={DEVICE_TRACKS_COLOR} />
-            <span className="layer__name">Device tracks</span>
-          </button>
-          <Toggle
-            on={layers.deviceTracksVisible}
-            onChange={() => layers.toggleDeviceTracks()}
-            label="Toggle Device tracks layer"
-          />
-        </div>
-
-        {layers.deviceTracksExpanded && (
-          <div className="layer__sublayers">
-            <div className="sublayer">
-              <span className="sublayer__name">Pings</span>
+      {layerConfigs.length === 0 ? (
+        <div className="layers-widget__empty">No layers</div>
+      ) : (
+        layerConfigs.map((layer) => (
+          <div className="layer" key={layer.id}>
+            <div className="layer__header">
+              <span className="layer__leaf">
+                {layer.type === 'ICON' && (
+                  <LayerIcon svg={ICON_SVG[layer.icon]} color={layer.color} />
+                )}
+                <span className="layer__name">{layer.name}</span>
+              </span>
               <Toggle
-                on={layers.pingsVisible}
-                onChange={() => layers.togglePings()}
-                label="Toggle pings sublayer"
+                on={layers.isLayerVisible(layer.id)}
+                onChange={() => layers.toggleLayer(layer.id)}
+                label={`Toggle ${layer.name} layer`}
               />
             </div>
           </div>
-        )}
-      </div>
-
-      <div className="layer">
-        <div className="layer__header">
-          <span className="layer__leaf">
-            <LayerIcon svg={squareIcon} color={GEOFENCE_COLOR} />
-            <span className="layer__name">Geofence (Enter/Exit)</span>
-          </span>
-          <Toggle
-            on={layers.geofenceVisible}
-            onChange={() => layers.toggleGeofence()}
-            label="Toggle Geofence events layer"
-          />
-        </div>
-      </div>
-
-      <div className="layer">
-        <div className="layer__header">
-          <span className="layer__leaf">
-            <LayerIcon svg={triangleIcon} color={AIS_OFF_COLOR} />
-            <span className="layer__name">AIS Off</span>
-          </span>
-          <Toggle
-            on={layers.aisOffVisible}
-            onChange={() => layers.toggleAisOff()}
-            label="Toggle AIS-off events layer"
-          />
-        </div>
-      </div>
+        ))
+      )}
     </div>
   );
 });

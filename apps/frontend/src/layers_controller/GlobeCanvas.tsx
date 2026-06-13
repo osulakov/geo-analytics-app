@@ -31,6 +31,18 @@ geofenceIcon.src =
 const AIS_OFF_COLOR = '#ef6a20';
 const AIS_OFF_SIZE = 14;
 
+// Areas of interest. Committed polygons are blue; the in-progress draft is
+// yellow so it reads as "still drawing".
+const AOI_STROKE = '#3b82f6';
+const AOI_FILL = 'rgba(59, 130, 246, 0.2)';
+const AOI_DRAFT_STROKE = '#facc15';
+const AOI_DRAFT_HINT = 'rgba(250, 204, 21, 0.5)';
+// AOIs in the "Added" working set are highlighted yellow; library-only blue.
+const AOI_ADDED_STROKE = '#facc15';
+const AOI_ADDED_FILL = 'rgba(250, 204, 21, 0.22)';
+// Click within this many pixels of the first vertex to close the polygon.
+const AOI_CLOSE_RADIUS_PX = 12;
+
 // Pre-compute the geometry once at module load — it never changes.
 const topology = countries110m as unknown as Topology;
 const countriesObject = topology.objects.countries as GeometryCollection;
@@ -197,6 +209,14 @@ export interface EezHover {
   y: number;
 }
 
+/** An area of interest under the cursor. */
+export interface AoiHover {
+  name: string;
+  areaKm2: number;
+  x: number;
+  y: number;
+}
+
 /** A map event under the cursor. */
 export interface EventHover {
   event: MapEvent;
@@ -218,6 +238,8 @@ interface GlobeCanvasProps {
   onHover?: (hover: PingHover | null) => void;
   /** Called when the hovered EEZ boundary changes. */
   onEezHover?: (hover: EezHover | null) => void;
+  /** Called when the hovered AOI changes. */
+  onAoiHover?: (hover: AoiHover | null) => void;
   /** Called when the hovered event marker changes. */
   onEventHover?: (hover: EventHover | null) => void;
   /** Called when the hovered satellite (ping or coverage strip) changes. */
@@ -313,6 +335,7 @@ const markers: Feature<Point>[] = [
 export function GlobeCanvas({
   onHover,
   onEezHover,
+  onAoiHover,
   onEventHover,
   onSatelliteHover,
   onSelect,
@@ -327,6 +350,8 @@ export function GlobeCanvas({
   onHoverRef.current = onHover;
   const onEezHoverRef = useRef(onEezHover);
   onEezHoverRef.current = onEezHover;
+  const onAoiHoverRef = useRef(onAoiHover);
+  onAoiHoverRef.current = onAoiHover;
   const onEventHoverRef = useRef(onEventHover);
   onEventHoverRef.current = onEventHover;
   const onSatelliteHoverRef = useRef(onSatelliteHover);
@@ -349,6 +374,7 @@ export function GlobeCanvas({
     const layerStore = stores.layers;
     const eventStore = stores.event;
     const satelliteStore = stores.satellite;
+    const aoiStore = stores.aoi;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
@@ -370,6 +396,8 @@ export function GlobeCanvas({
     let eventHoveredKey: string | null = null;
     // Identity of the hovered satellite (name + ping/coverage, for change detection).
     let satHoveredKey: string | null = null;
+    // Id of the hovered AOI (for change detection).
+    let aoiHoveredId: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -454,6 +482,71 @@ export function GlobeCanvas({
       ctx.strokeStyle = COLORS.outline;
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      // Areas of interest: committed polygons (filled) + the in-progress draft.
+      // When the Library is open, the user's saved AOIs are drawn too.
+      const aoiCenter: [number, number] = [-globe.rotationLambda, -globe.rotationPhi];
+      const aoiSource = aoiStore.libraryOpen
+        ? [...aoiStore.aois, ...aoiStore.library]
+        : aoiStore.aois;
+      const seenAoi = new Set<string>();
+      const addedAoiIds = new Set(aoiStore.aois.map((a) => a.id));
+      for (const aoi of aoiSource) {
+        if (aoi.coordinates.length < 3 || seenAoi.has(aoi.id)) continue;
+        seenAoi.add(aoi.id);
+        const added = addedAoiIds.has(aoi.id);
+        const ring = [...aoi.coordinates, aoi.coordinates[0]];
+        ctx.beginPath();
+        path({ type: 'Polygon', coordinates: [ring] });
+        ctx.fillStyle = added ? AOI_ADDED_FILL : AOI_FILL;
+        ctx.fill();
+        ctx.strokeStyle = added ? AOI_ADDED_STROKE : AOI_STROKE;
+        ctx.lineWidth = added ? 2 : 1.6;
+        ctx.stroke();
+      }
+
+      if (aoiStore.drawing && aoiStore.draftPoints.length > 0) {
+        const pts = aoiStore.draftPoints;
+        // Placed edges.
+        if (pts.length >= 2) {
+          ctx.beginPath();
+          path({ type: 'LineString', coordinates: pts });
+          ctx.strokeStyle = AOI_DRAFT_STROKE;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        }
+        // Rubber-band edge from the last vertex to the cursor.
+        if (mouse.inside && projection.invert) {
+          const cursorGeo = projection.invert([mouse.x, mouse.y]);
+          if (cursorGeo) {
+            ctx.beginPath();
+            path({ type: 'LineString', coordinates: [pts[pts.length - 1], cursorGeo] });
+            ctx.strokeStyle = AOI_DRAFT_HINT;
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+        // Vertex dots; the first vertex gets a ring once the polygon is closeable.
+        pts.forEach((p, index) => {
+          if (geoDistance(p, aoiCenter) > Math.PI / 2) return; // far side
+          const proj = projection(p);
+          if (!proj) return;
+          const first = index === 0;
+          ctx.beginPath();
+          ctx.arc(proj[0], proj[1], first ? 5 : 3, 0, 2 * Math.PI);
+          ctx.fillStyle = first ? AOI_DRAFT_STROKE : '#ffffff';
+          ctx.fill();
+          if (first && pts.length >= 3) {
+            ctx.beginPath();
+            ctx.arc(proj[0], proj[1], 9, 0, 2 * Math.PI);
+            ctx.strokeStyle = AOI_DRAFT_STROKE;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        });
+      }
 
       // Point markers, drawn on top with a fixed pixel size. The centre of the
       // visible hemisphere is [-lambda, -phi]; markers more than 90° away are
@@ -805,11 +898,40 @@ export function GlobeCanvas({
         onEventHoverRef.current?.(activeEvent);
       }
 
-      // EEZ boundary hover (only when no ping or event is under the cursor). Find the
-      // nearest boundary vertex by planar distance, then confirm it's within a
-      // few pixels on screen.
+      // AOI hover (below pings/events). Hit-test the polygon under the cursor.
+      let aoiHover: AoiHover | null = null;
+      let aoiHoverId: string | null = null;
+      if (checkHover && !nearest && !activeEvent && projection.invert) {
+        const geo = projection.invert([mouse.x, mouse.y]);
+        const hitId = geo ? aoiStore.hitTest([geo[0], geo[1]]) : null;
+        if (hitId) {
+          const a =
+            aoiStore.aois.find((x) => x.id === hitId) ??
+            aoiStore.library.find((x) => x.id === hitId);
+          if (a) {
+            aoiHoverId = hitId;
+            aoiHover = { name: a.name, areaKm2: a.areaKm2, x: mouse.x, y: mouse.y };
+          }
+        }
+      }
+      if (aoiHoverId !== aoiHoveredId) {
+        aoiHoveredId = aoiHoverId;
+        onAoiHoverRef.current?.(aoiHover);
+      }
+
+      // EEZ boundary hover (only when no ping, event or AOI is under the cursor).
+      // Find the nearest boundary vertex by planar distance, then confirm it's
+      // within a few pixels on screen.
       let eezName: string | null = null;
-      if (globe.showEez && checkHover && !nearest && !activeEvent && eezPoints && projection.invert) {
+      if (
+        globe.showEez &&
+        checkHover &&
+        !nearest &&
+        !activeEvent &&
+        !aoiHover &&
+        eezPoints &&
+        projection.invert
+      ) {
         const geo = projection.invert([mouse.x, mouse.y]);
         if (geo) {
           const [glon, glat] = geo;
@@ -872,6 +994,14 @@ export function GlobeCanvas({
       }
     };
 
+    // Invert a canvas point to [lon, lat], using the current view. Returns null
+    // when the point falls outside the globe disk.
+    const screenToLonLat = (px: number, py: number): [number, number] | null => {
+      projection.rotate([globe.rotationLambda, globe.rotationPhi, 0]).scale(baseRadius * globe.zoom);
+      const inv = projection.invert?.([px, py]);
+      return inv ? [inv[0], inv[1]] : null;
+    };
+
     const onPointerDown = (event: PointerEvent) => {
       dragging = true;
       lastX = event.clientX;
@@ -896,7 +1026,10 @@ export function GlobeCanvas({
       mouse.y = event.offsetY;
       mouse.inside = true;
 
-      if (!dragging) return;
+      if (!dragging) {
+        canvas.style.cursor = aoiStore.drawing ? 'crosshair' : 'grab';
+        return;
+      }
       if (Math.abs(event.clientX - downX) > 4 || Math.abs(event.clientY - downY) > 4) {
         didDrag = true;
       }
@@ -919,10 +1052,44 @@ export function GlobeCanvas({
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
       }
-      canvas.style.cursor = 'grab';
-      // A press-release on a ping with no real drag is a click → select it.
-      if (!didDrag && pressedMmsi) {
-        onSelectRef.current?.(pressedMmsi);
+      canvas.style.cursor = aoiStore.drawing ? 'crosshair' : 'grab';
+
+      // Draw mode: a click adds a vertex, or closes the polygon when it lands
+      // on the first vertex. Dragging rotates the globe and adds nothing.
+      if (aoiStore.drawing) {
+        if (!didDrag) {
+          const pts = aoiStore.draftPoints;
+          if (pts.length >= 3) {
+            const firstProj = projection(pts[0]);
+            if (
+              firstProj &&
+              Math.hypot(firstProj[0] - event.offsetX, firstProj[1] - event.offsetY) <=
+                AOI_CLOSE_RADIUS_PX
+            ) {
+              aoiStore.finishDrawing();
+              pressedMmsi = null;
+              return;
+            }
+          }
+          const geo = screenToLonLat(event.offsetX, event.offsetY);
+          if (geo) aoiStore.addPoint(geo[0], geo[1]);
+        }
+        pressedMmsi = null;
+        return;
+      }
+
+      // A press-release with no real drag is a click. A ping under the cursor
+      // wins; otherwise hit-test the AOIs and select/deselect.
+      if (!didDrag) {
+        if (pressedMmsi) {
+          onSelectRef.current?.(pressedMmsi);
+        } else {
+          // Selecting another AOI switches selection; clicking empty space
+          // keeps the current selection.
+          const geo = screenToLonLat(event.offsetX, event.offsetY);
+          const hit = geo ? aoiStore.hitTest(geo) : null;
+          if (hit) aoiStore.selectAoi(hit);
+        }
       }
       pressedMmsi = null;
     };
@@ -978,6 +1145,11 @@ export function GlobeCanvas({
       zoomAtPointer(event.offsetX, event.offsetY, Math.exp(-event.deltaY * factor));
     };
 
+    // Esc cancels an in-progress AOI draft.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && aoiStore.drawing) aoiStore.cancelDrawing();
+    };
+
     canvas.style.cursor = 'grab';
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
@@ -985,6 +1157,7 @@ export function GlobeCanvas({
     canvas.addEventListener('pointercancel', onPointerUp);
     canvas.addEventListener('pointerleave', onPointerLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
 
     // --- Viewport reporting: emit the visible cap after the view settles ---
     let lastViewKey = '';
@@ -1017,7 +1190,7 @@ export function GlobeCanvas({
       // Earth rotation and satellite orbits share one real-time clock (real
       // time at 1×); the playback speed multiplier scales both equally, so
       // their relative rates stay physically correct.
-      if (globe.spinning && !dragging && hoveredMmsi === null) {
+      if (globe.spinning && !dragging && hoveredMmsi === null && !aoiStore.drawing) {
         const scaled = dt * (globe.speed || 1);
         globe.advanceSpin(scaled);
         satClockMs += scaled;
@@ -1052,6 +1225,7 @@ export function GlobeCanvas({
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [stores]);
 

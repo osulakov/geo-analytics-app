@@ -15,6 +15,9 @@ function isAbort(error: unknown): boolean {
 export class EventStore {
   geofence: MapEvent[] = [];
   aisOff: MapEvent[] = [];
+  /** When a job has been run, the map shows that job's events only and the
+   *  viewport-driven DB fetch is suppressed. */
+  jobMode = false;
 
   controller: AbortController | null = null;
 
@@ -23,8 +26,9 @@ export class EventStore {
   }
 
   /** Load all events within the given ISO range + viewport cap (one request),
-   *  then split them by event type. */
+   *  then split them by event type. No-op while showing a job's events. */
   async load(fromIso: string, toIso: string, cap?: ViewportCap | null): Promise<void> {
+    if (this.jobMode) return;
     this.controller?.abort();
     const controller = new AbortController();
     this.controller = controller;
@@ -38,5 +42,22 @@ export class EventStore {
     } catch (error) {
       if (!isAbort(error)) console.error('Failed to load events:', error);
     }
+  }
+
+  /** Show a job's produced events (no DB fetch); future viewport loads are
+   *  suppressed until `clearJob()`. */
+  setJobEvents(events: MapEvent[]): void {
+    this.controller?.abort();
+    this.controller = null;
+    this.jobMode = true;
+    this.geofence = events.filter((e) => e.eventType === 'geofence_enter_exit');
+    this.aisOff = events.filter((e) => e.eventType === 'ais_off');
+  }
+
+  /** Resume normal viewport-driven event loading. */
+  clearJob(): void {
+    this.jobMode = false;
+    this.geofence = [];
+    this.aisOff = [];
   }
 }

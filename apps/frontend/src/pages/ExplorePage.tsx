@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
+import AddIcon from '@mui/icons-material/Add';
+import HistoryIcon from '@mui/icons-material/History';
 
+import { AnalysesWidget } from '../components/AnalysesWidget';
 import { AoisWidget } from '../components/AoisWidget';
+import { AoiTooltip } from '../layers_controller/AoiTooltip';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
 import { DateRangeWidget } from '../components/DateRangeWidget';
@@ -9,20 +13,25 @@ import { EezTooltip } from '../layers_controller/EezTooltip';
 import { EventTooltip } from '../layers_controller/EventTooltip';
 import {
   GlobeCanvas,
+  type AoiHover,
   type EezHover,
   type EventHover,
   type PingHover,
   type SatelliteHover,
 } from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
-import { LayersWidget } from '../components/LayersWidget';
+import { JobResultsColumn } from '../components/JobResultsColumn';
+// Vessels widget is hidden for now; it'll show with a recent job.
+// import { VesselsWidget } from '../components/VesselsWidget';
+import { RecentJobsWidget } from '../components/RecentJobsWidget';
+import { RunJobWidget } from '../components/RunJobWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
 import { SatelliteTooltip } from '../layers_controller/SatelliteTooltip';
 import { DataWidget } from '../components/DataWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
 import { VesselModal } from '../components/VesselModal';
-import { VesselsWidget } from '../components/VesselsWidget';
+// import { VesselsWidget } from '../components/VesselsWidget';
 import { VesselTooltip } from '../layers_controller/VesselTooltip';
 import { WelcomeBadge } from '../components/WelcomeBadge';
 import { useStores } from '../stores/StoreContext';
@@ -31,9 +40,14 @@ export function ExplorePage() {
   const stores = useStores();
   const [hover, setHover] = useState<PingHover | null>(null);
   const [eezHover, setEezHover] = useState<EezHover | null>(null);
+  const [aoiHover, setAoiHover] = useState<AoiHover | null>(null);
   const [eventHover, setEventHover] = useState<EventHover | null>(null);
   const [satHover, setSatHover] = useState<SatelliteHover | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  // Top-left toolbar: radio-style — exactly one widget group is shown.
+  const [activeNav, setActiveNav] = useState<'newJob' | 'recentJobs'>('newJob');
+  const showNewJob = activeNav === 'newJob';
+  const showRecentJobs = activeNav === 'recentJobs';
 
   useEffect(() => {
     // Pings/events load per-viewport once the globe reports its first cap.
@@ -90,6 +104,7 @@ export function ExplorePage() {
       <GlobeCanvas
         onHover={setHover}
         onEezHover={setEezHover}
+        onAoiHover={setAoiHover}
         onEventHover={setEventHover}
         onSatelliteHover={setSatHover}
         onSelect={handleSelect}
@@ -107,14 +122,45 @@ export function ExplorePage() {
         </div>
         <DataWidget />
       </div>
-      <div className="left-stack">
+      <div className="left-region">
         <Brand />
-        <div className="stack-title stack-title--setup">Setup</div>
-        <DateRangeWidget />
-        <AoisWidget />
-        <div className="stack-title stack-title--results">Results</div>
-        <VesselsWidget />
-        <LayersWidget />
+        <div className="left-region__body">
+          <div className="globe-controls widget-toolbar">
+            <button
+              type="button"
+              className={showNewJob ? 'active' : ''}
+              title="New job — date range, AOIs, analyses"
+              aria-label="Show new job widgets"
+              role="radio"
+              aria-checked={showNewJob}
+              onClick={() => setActiveNav('newJob')}
+            >
+              <AddIcon fontSize="small" />
+            </button>
+            <button
+              type="button"
+              className={showRecentJobs ? 'active' : ''}
+              title="Recent jobs"
+              aria-label="Show recent jobs"
+              role="radio"
+              aria-checked={showRecentJobs}
+              onClick={() => setActiveNav('recentJobs')}
+            >
+              <HistoryIcon fontSize="small" />
+            </button>
+          </div>
+          <div className="left-stack">
+            {showNewJob && <DateRangeWidget />}
+            {showNewJob && <AoisWidget />}
+            {showNewJob && <AnalysesWidget />}
+            {showNewJob && <RunJobWidget />}
+            {showRecentJobs && <RecentJobsWidget />}
+            {/* Vessels widget is shown with a recent job (later). */}
+            {/* <VesselsWidget /> */}
+          </div>
+          {/* Second column: Layers for the job results, after a run. */}
+          {showNewJob && <JobResultsColumn />}
+        </div>
       </div>
       {satHover && !selected && (
         <SatelliteTooltip
@@ -136,7 +182,15 @@ export function ExplorePage() {
       {eventHover && !satHover && !hover && !selected && (
         <EventTooltip event={eventHover.event} x={eventHover.x} y={eventHover.y} />
       )}
-      {eezHover && !satHover && !hover && !eventHover && !selected && (
+      {aoiHover && !satHover && !hover && !eventHover && !selected && (
+        <AoiTooltip
+          name={aoiHover.name}
+          areaKm2={aoiHover.areaKm2}
+          x={aoiHover.x}
+          y={aoiHover.y}
+        />
+      )}
+      {eezHover && !satHover && !hover && !eventHover && !aoiHover && !selected && (
         <EezTooltip name={eezHover.name} x={eezHover.x} y={eezHover.y} />
       )}
       {selected && (

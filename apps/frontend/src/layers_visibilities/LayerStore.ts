@@ -1,8 +1,14 @@
 import { makeAutoObservable } from 'mobx';
 
+import { ANALYSES } from '../analyses_configs';
+
 /**
- * Visibility of map layers. Currently one layer — "Device tracks" — with a
- * "pings" sublayer. The parent acts as a master switch for the group.
+ * Visibility of map layers.
+ *
+ * Event layers shown in the Layers widget are declared by analyses
+ * (`AnalysisConfig.layers_config`) and tracked here generically by their id, so
+ * the widget and store stay in sync with the configs. The "Device tracks" group
+ * (with its "pings" sublayer) is a built-in, controlled from the Data widget.
  */
 export class LayerStore {
   /** Master switch for the Device-tracks layer group. */
@@ -12,11 +18,8 @@ export class LayerStore {
   /** Whether the Device-tracks sublayers are expanded (collapsed by default). */
   deviceTracksExpanded = false;
 
-  /** Geofence enter/exit event markers. */
-  geofenceVisible = false;
-
-  /** AIS-off (gap) event markers. */
-  aisOffVisible = false;
+  /** Visible configured event layers, keyed by their `layers_config` id. */
+  visibleLayers = new Set<string>();
 
   constructor() {
     makeAutoObservable(this);
@@ -25,6 +28,26 @@ export class LayerStore {
   /** Effective visibility of the ping markers. */
   get pingsActive(): boolean {
     return this.deviceTracksVisible && this.pingsVisible;
+  }
+
+  /** Whether a configured layer (by id) is currently shown. */
+  isLayerVisible(id: string): boolean {
+    return this.visibleLayers.has(id);
+  }
+
+  /** Toggle a configured layer's visibility. */
+  toggleLayer(id: string): void {
+    if (this.visibleLayers.has(id)) this.visibleLayers.delete(id);
+    else this.visibleLayers.add(id);
+  }
+
+  // Back-compat accessors for the map renderer (read by GlobeCanvas).
+  get geofenceVisible(): boolean {
+    return this.visibleLayers.has('geofence');
+  }
+
+  get aisOffVisible(): boolean {
+    return this.visibleLayers.has('ais-off');
   }
 
   toggleDeviceTracks(): void {
@@ -44,11 +67,12 @@ export class LayerStore {
     this.deviceTracksExpanded = !this.deviceTracksExpanded;
   }
 
-  toggleGeofence(): void {
-    this.geofenceVisible = !this.geofenceVisible;
-  }
-
-  toggleAisOff(): void {
-    this.aisOffVisible = !this.aisOffVisible;
+  /** Turn every layer on (used after a job run reveals the results). */
+  showAll(): void {
+    this.deviceTracksVisible = true;
+    this.pingsVisible = true;
+    for (const analysis of ANALYSES) {
+      for (const layer of analysis.layers_config) this.visibleLayers.add(layer.id);
+    }
   }
 }

@@ -152,6 +152,21 @@ export function vesselsApiPlugin(): Plugin {
         // --- Mutations (groups) -------------------------------------------
         if (req.method === 'POST') {
           try {
+            // Run a read-only analysis query (built client-side from an
+            // analysis config). SELECT-only to limit the dev-plugin footgun.
+            if (pathname === '/query') {
+              const body = await readJsonBody(req);
+              const sql = String(body.sql ?? '');
+              const params = Array.isArray(body.params) ? (body.params as unknown[]) : [];
+              if (!/^\s*select\b/i.test(sql) || /;/.test(sql.trim().slice(0, -1))) {
+                json(400, { error: 'Only single SELECT statements are allowed' });
+                return;
+              }
+              const { rows } = await getPool().query(sql, params);
+              json(200, rows);
+              return;
+            }
+
             if (pathname === '/groups') {
               await ensureGroups();
               const body = await readJsonBody(req);

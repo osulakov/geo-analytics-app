@@ -1,8 +1,11 @@
+import { AnalysisStore } from './AnalysisStore';
+import { AoiStore } from './AoiStore';
 import { AuthStore } from './AuthStore';
 import { ChatStore } from './ChatStore';
 import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
+import { JobStore } from './JobStore';
 import { LayerStore } from '../layers_visibilities/LayerStore';
 import { PingStore } from './PingStore';
 import { SatelliteStore } from './SatelliteStore';
@@ -19,9 +22,15 @@ export class RootStore {
   group: GroupStore;
   layers: LayerStore;
   event: EventStore;
+  aoi: AoiStore;
+  analysis: AnalysisStore;
+  job: JobStore;
 
   constructor() {
     this.auth = new AuthStore();
+    this.aoi = new AoiStore(this.auth);
+    this.analysis = new AnalysisStore();
+    this.job = new JobStore(this.auth);
     this.globe = new GlobeStore();
     this.chat = new ChatStore();
     this.ping = new PingStore();

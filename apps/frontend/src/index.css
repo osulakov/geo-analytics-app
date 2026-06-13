@@ -17,7 +17,7 @@
   --fixed-very-dark-gray: #2b2b2b;
 
   /* Surfaces (layered panels / controls) */
-  --surface-panel: rgba(42, 45, 50, 0.64);
+  --surface-panel: rgba(50, 54, 60, 0.64);
   --surface-control: rgba(31, 37, 46, 0.72);
   --surface-control-hover: rgba(55, 65, 81, 0.9);
   --surface-control-active: rgba(75, 85, 99, 0.95);
@@ -62,13 +62,17 @@
   --blur-control: blur(6px);
   --transition: 0.15s ease;
   /* Subtle glow on widget wrappers (faint white halo + soft depth shadow). */
-  --widget-glow: 0 0 24px rgba(255, 255, 255, 0.072), 0 6px 20px rgba(0, 0, 0, 0.35);
+  --widget-glow:
+    0 0 28px rgba(255, 255, 255, 0.126), 0 6px 20px rgba(0, 0, 0, 0.35);
+  /* Light-grey widget border. */
+  --widget-border: rgba(78, 78, 78, 0.107);
 
   /* Disabled state */
   --disabled-opacity: 0.4;
 
   /* Typography */
-  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-family:
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   font-family: var(--font-family);
   color-scheme: dark;
@@ -226,17 +230,210 @@ body {
   background: var(--accent-soft);
 }
 
-.left-stack {
+/* Top-left region: logo on top, then a row of [toolbar rail | widgets]. */
+.left-region {
   position: fixed;
   top: 20px;
   left: 20px;
   z-index: 20;
-  width: 21.5625vw;
-  min-width: 242px;
   max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   gap: var(--widget-gap);
+}
+
+.left-region__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--widget-gap);
+  min-height: 0;
+}
+
+.left-stack {
+  width: 21.5625vw;
+  min-width: 242px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--widget-gap);
+}
+
+/* Run Job widget: a panel with centered Run / Save buttons on one line. */
+.run-job {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.run-job__save {
+  padding: 6px 16.8px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 8.4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.run-job__save:hover {
+  background: var(--surface-control-hover);
+}
+
+/* Save Job modal */
+.save-job-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--widget-gap);
+  width: min(420px, 92vw);
+  padding: var(--modal-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.save-job-modal__title {
+  color: var(--color-title);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.save-job-modal__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.save-job-modal__summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.save-job-modal__summary > div > span:first-child {
+  opacity: 0.55;
+}
+
+.save-job-modal__summary > div > span:last-child {
+  text-align: right;
+  min-width: 0;
+}
+
+.save-job-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.save-job-modal__field input {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  outline: none;
+}
+
+.save-job-modal__error {
+  font-size: 12px;
+  color: var(--fixed-red);
+}
+
+.save-job-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--element-gap);
+}
+
+.save-job-modal__cancel,
+.save-job-modal__save {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--element-radius);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.save-job-modal__cancel {
+  background: var(--surface-control);
+  color: var(--color-fg);
+}
+
+.save-job-modal__cancel:hover {
+  background: var(--surface-control-hover);
+}
+
+.save-job-modal__save {
+  background: var(--color-primary);
+  color: #06231d;
+  font-weight: 600;
+}
+
+.save-job-modal__save:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.save-job-modal__save:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.run-job__button {
+  padding: 6px 16.8px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 8.4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.run-job__button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.run-job__button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+/* Toolbar rail: reuses .globe-controls button styling but flows in the row
+   (aligned with the widget level) instead of being pinned to a corner. */
+.globe-controls.widget-toolbar {
+  position: static;
+  right: auto;
+  bottom: auto;
 }
 
 .right-stack {
@@ -302,7 +499,9 @@ body {
   font-size: 9.36px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  text-shadow: 0 0 8px rgba(29, 192, 156, 0.75), 0 0 16px rgba(29, 192, 156, 0.4);
+  text-shadow:
+    0 0 8px rgba(29, 192, 156, 0.75),
+    0 0 16px rgba(29, 192, 156, 0.4);
 }
 
 .date-range {
@@ -329,7 +528,7 @@ body {
 
 .aois-widget__title {
   color: var(--color-title);
-  font-size: 6.48px;
+  font-size: 8.42px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -361,15 +560,238 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.aoi-option.is-active {
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  color: var(--color-primary);
+}
+
 /* Higher specificity than MUI's .MuiSvgIcon-fontSizeInherit so the size sticks. */
 .aois-widget .aoi-option__icon {
   font-size: 14px;
   opacity: 0.85;
 }
 
+.aoi-draw-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: rgba(250, 204, 21, 0.1);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.aoi-draw-hint__text {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.8;
+}
+
+.aoi-draw-hint__cancel {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.aoi-draw-hint__cancel:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.aoi-empty {
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+/* Align the section labels with the indented list content in the Data-widget
+   layout (the Analyses widget reuses .aoi-section). */
+.data-widget .aoi-section__label {
+  padding-left: var(--widget-padding);
+}
+
+.analysis-row {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  padding: var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.analysis-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+}
+
+.analysis-item__name {
+  font-size: 12px;
+}
+
+.analysis-item__desc {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.55;
+}
+
+.aoi-search {
+  width: 100%;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.aoi-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+}
+
+.aoi-section__label {
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.aoi-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+}
+
+.aoi-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--element-padding-x);
+  padding-top: var(--text-gap);
+  font-size: 11px;
+}
+
+.aoi-pager__count {
+  opacity: 0.5;
+}
+
+.aoi-pager button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.aoi-pager button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.aoi-row {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  padding: var(--text-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.aoi-row__name {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: background var(--transition);
+}
+
+.aoi-row__name:hover,
+.aoi-row__name:focus {
+  background: var(--surface-input);
+}
+
+.aoi-row__area {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.aoi-row__save,
+.aoi-row__add,
+.aoi-row__trash {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-size: 15px;
+  opacity: 0.55;
+  cursor: pointer;
+  transition:
+    opacity var(--transition),
+    color var(--transition);
+}
+
+.aoi-row__add:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.aoi-row__add:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.aoi-row__trash:hover {
+  opacity: 1;
+  color: var(--fixed-red);
+}
+
+.aoi-row__save:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.aoi-row__save:disabled {
+  cursor: default;
+}
+
+.aoi-row__save.is-saved {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
 .date-range__label {
   align-self: flex-start;
-  font-size: 6.48px;
+  font-size: 8.42px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.5;
@@ -481,7 +903,8 @@ body {
   border: none;
   color: var(--color-title);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -562,7 +985,10 @@ body {
   color: var(--color-fg);
   opacity: 0.6;
   cursor: pointer;
-  transition: background var(--transition), opacity var(--transition), color var(--transition);
+  transition:
+    background var(--transition),
+    opacity var(--transition),
+    color var(--transition);
 }
 
 .vessel-row__path:hover {
@@ -651,7 +1077,8 @@ body {
 
 .layers-widget__title {
   color: var(--color-title);
-  font-size: 14px;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -681,7 +1108,8 @@ body {
   min-width: 0;
   color: var(--color-title);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: left;
 }
@@ -768,8 +1196,18 @@ body {
 .data-widget__section-title {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.data-widget__group-label {
+  padding: 0 var(--widget-padding) var(--text-gap);
+  color: var(--color-title);
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
 }
 
 .satellite-row {
@@ -843,7 +1281,10 @@ body {
   font-size: 13px;
   opacity: 0.6;
   cursor: pointer;
-  transition: background var(--transition), opacity var(--transition), color var(--transition);
+  transition:
+    background var(--transition),
+    opacity var(--transition),
+    color var(--transition);
 }
 
 .satellite-row__icon:hover {
@@ -1019,7 +1460,9 @@ body {
   border-radius: var(--widget-radius);
   backdrop-filter: var(--blur-panel);
   overflow: hidden;
-  transition: width 0.28s ease, min-width 0.28s ease;
+  transition:
+    width 0.28s ease,
+    min-width 0.28s ease;
 }
 
 .chat-widget.is-collapsed {
@@ -1062,7 +1505,9 @@ body {
   min-height: 0;
   max-height: 60vh;
   overflow: hidden;
-  transition: max-height 0.28s ease, opacity 0.2s ease;
+  transition:
+    max-height 0.28s ease,
+    opacity 0.2s ease;
 }
 
 .chat-widget.is-collapsed .chat-widget__body {
@@ -1157,7 +1602,7 @@ body {
   outline: none;
 }
 
-.chat-widget__input button[type='submit'] {
+.chat-widget__input button[type="submit"] {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1171,11 +1616,11 @@ body {
   transition: background var(--transition);
 }
 
-.chat-widget__input button[type='submit']:hover:not(:disabled) {
+.chat-widget__input button[type="submit"]:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-.chat-widget__input button[type='submit']:disabled {
+.chat-widget__input button[type="submit"]:disabled {
   opacity: var(--disabled-opacity);
   cursor: default;
 }
@@ -1510,7 +1955,8 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--widget-gap);
-  padding: var(--element-gap) var(--text-gap) var(--element-gap) var(--element-padding-y);
+  padding: var(--element-gap) var(--text-gap) var(--element-gap)
+    var(--element-padding-y);
   border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
   font-size: 12px;
@@ -1557,7 +2003,9 @@ body {
   color: var(--color-fg);
   opacity: 0.5;
   cursor: pointer;
-  transition: color var(--transition), opacity var(--transition);
+  transition:
+    color var(--transition),
+    opacity var(--transition);
 }
 
 .vessel-modal__group-delete:hover {
@@ -1634,7 +2082,8 @@ body {
 }
 
 .vessels-widget__groups-title {
-  font-size: 13px;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: var(--space-1);
 }
@@ -1643,7 +2092,8 @@ body {
   display: flex;
   align-items: center;
   gap: var(--element-gap);
-  padding: var(--text-gap) var(--element-gap) var(--text-gap) var(--element-padding-y);
+  padding: var(--text-gap) var(--element-gap) var(--text-gap)
+    var(--element-padding-y);
   border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
   font-size: 12px;
@@ -1675,7 +2125,10 @@ body {
   color: var(--color-fg);
   opacity: 0.6;
   cursor: pointer;
-  transition: background var(--transition), opacity var(--transition), color var(--transition);
+  transition:
+    background var(--transition),
+    opacity var(--transition),
+    color var(--transition);
 }
 
 .group-row__icon:hover {
@@ -1761,7 +2214,8 @@ body {
   display: flex;
   align-items: center;
   gap: var(--widget-gap);
-  padding: var(--element-gap) var(--element-gap) var(--element-gap) var(--element-padding-y);
+  padding: var(--element-gap) var(--element-gap) var(--element-gap)
+    var(--element-padding-y);
   border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
 }
@@ -1862,6 +2316,31 @@ body {
   font-size: 12px;
 }
 
+.aoi-tooltip {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  max-width: 240px;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  background: rgba(20, 24, 31, 0.4);
+  border-radius: var(--element-radius);
+  backdrop-filter: blur(6px);
+  color: var(--color-fg);
+  font-size: 12px;
+}
+
+.aoi-tooltip__title {
+  font-weight: 700;
+  color: var(--fixed-yellow);
+}
+
+.aoi-tooltip__area {
+  margin-top: var(--text-gap);
+  font-size: 0.85em;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
 .vessel-tooltip,
 .event-tooltip,
 .satellite-tooltip {
@@ -1942,11 +2421,13 @@ body {
   text-align: right;
 }
 
-/* Subtle glow on every widget / dialog / tooltip wrapper. */
+/* Subtle glow + border on every widget / dialog / tooltip wrapper. */
 .date-range__trigger,
 .date-range__dropdown,
 .vessels-widget,
 .layers-widget,
+.aois-widget,
+.satellites-widget,
 .data-widget,
 .chat-widget,
 .ship-counter,
@@ -1958,8 +2439,10 @@ body {
 .confirm-dialog,
 .vessel-tooltip,
 .satellite-tooltip,
-.eez-tooltip {
+.eez-tooltip,
+.run-job {
   box-shadow: var(--widget-glow);
+  border: 1px solid var(--widget-border);
 }
 
 /* ---- Landing / workspace chooser ---- */
@@ -2239,7 +2722,9 @@ body {
   letter-spacing: 0.08em;
   opacity: 0.6;
   cursor: pointer;
-  transition: opacity var(--transition), color var(--transition);
+  transition:
+    opacity var(--transition),
+    color var(--transition);
 }
 
 .landing__more:hover {
@@ -2303,7 +2788,9 @@ body {
   line-height: 1;
   opacity: 0.6;
   cursor: pointer;
-  transition: opacity var(--transition), background var(--transition);
+  transition:
+    opacity var(--transition),
+    background var(--transition);
 }
 
 .more-modal__close:hover {
@@ -2341,7 +2828,9 @@ body {
   padding: 16px;
   border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
-  transition: background var(--transition), transform var(--transition);
+  transition:
+    background var(--transition),
+    transform var(--transition);
 }
 
 .scenario-card:hover {
@@ -2390,7 +2879,9 @@ body {
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition), transform var(--transition);
+  transition:
+    background var(--transition),
+    transform var(--transition);
 }
 
 .workspace-card:not(.is-disabled):hover {

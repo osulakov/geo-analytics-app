@@ -6,9 +6,29 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 import { useStores } from '../stores/StoreContext';
+import triangleIcon from '../assets/analytics_triangle.svg?raw';
 import type { Satellite } from '../data_loaders/satellites';
 
+// Device tracks legend color (matches the yellow triangle markers on the map).
+const DEVICE_TRACKS_COLOR = '#facc15';
+
 const PAGE_SIZE = 5;
+
+/** Small box-style checkbox (same look as the Layers widget). */
+function Toggle({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      aria-label={label}
+      className={`box-checkbox${on ? ' is-checked' : ''}`}
+      onClick={onChange}
+    >
+      <span className="box-checkbox__fill" />
+    </button>
+  );
+}
 
 /** A labelled orbital field; renders "—" when the value is missing. */
 function DetailRow({ label, value, unit }: { label: string; value: number | null; unit: string }) {
@@ -106,7 +126,7 @@ const SatelliteRow = observer(function SatelliteRow({ sat }: { sat: Satellite })
  * sections can be added below it. Mirrors the layout of the Vessels widget.
  */
 export const DataWidget = observer(function DataWidget() {
-  const { satellite } = useStores();
+  const { satellite, layers } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -224,6 +244,23 @@ export const DataWidget = observer(function DataWidget() {
             >
               ›
             </button>
+          </div>
+
+          <div className="data-widget__group-label">AIS data</div>
+
+          <div className="data-widget__section-header">
+            <span
+              className="layer__icon"
+              style={{ color: DEVICE_TRACKS_COLOR }}
+              aria-hidden="true"
+              dangerouslySetInnerHTML={{ __html: triangleIcon }}
+            />
+            <span className="data-widget__section-title">Device tracks</span>
+            <Toggle
+              on={layers.deviceTracksVisible}
+              onChange={() => layers.toggleDeviceTracks()}
+              label="Toggle Device tracks layer"
+            />
           </div>
         </>
       )}

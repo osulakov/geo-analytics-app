@@ -2,8 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
-import { MainLogo } from '../assets/logo';
-import { SpinningGlobe } from '../components/SpinningGlobe';
+import { PageShell } from '../components/PageShell';
 
 interface Workspace {
   id: string;
@@ -189,27 +188,10 @@ export function LandingPage() {
   };
 
   return (
-    <main className="landing">
-      <SpinningGlobe />
+    <PageShell>
+      <div className="landing__prompt">Choose a workspace</div>
 
-      <div className="landing__panel">
-        <div className="landing__logo">
-          <MainLogo />
-        </div>
-
-        <div className="landing__domains">
-          <span className="landing__domain landing__domain--land">Land</span>
-          <span className="landing__domain-dot" />
-          <span className="landing__domain landing__domain--water">Water</span>
-          <span className="landing__domain-dot" />
-          <span className="landing__domain landing__domain--space">Space</span>
-          <span className="landing__domain-dot" />
-          <span className="landing__domain landing__domain--air">Air</span>
-        </div>
-
-        <div className="landing__prompt">Choose a workspace</div>
-
-        <div className="landing__workspaces">
+      <div className="landing__workspaces">
           {WORKSPACES.map((workspace) => {
             const enabled = Boolean(workspace.to);
             return (
@@ -246,7 +228,6 @@ export function LandingPage() {
             </svg>
           </button>
         </form>
-      </div>
 
       {showMore &&
         createPortal(
@@ -292,6 +273,6 @@ export function LandingPage() {
           </div>,
           document.body,
         )}
-    </main>
+    </PageShell>
   );
 }

@@ -48,8 +48,11 @@ export const DateRangeWidget = observer(function DateRangeWidget() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
-        <span className="date-range__value">
-          {ping.fromDate} → {ping.toDate}
+        <span className="date-range__main">
+          <span className="date-range__label">Date Range</span>
+          <span className="date-range__value">
+            {ping.fromDate} → {ping.toDate}
+          </span>
         </span>
         <svg
           className={`date-range__chevron${open ? ' is-open' : ''}`}

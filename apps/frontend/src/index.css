@@ -309,6 +309,72 @@ body {
   position: relative;
 }
 
+.date-range__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  min-width: 0;
+}
+
+.aois-widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.aois-widget__title {
+  color: var(--color-title);
+  font-size: 6.48px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.aois-widget__options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--element-gap);
+}
+
+.aoi-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.88px;
+  padding: 7.2px 4.8px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 8.64px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.aoi-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Higher specificity than MUI's .MuiSvgIcon-fontSizeInherit so the size sticks. */
+.aois-widget .aoi-option__icon {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.date-range__label {
+  align-self: flex-start;
+  font-size: 6.48px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
 .date-range__trigger {
   display: flex;
   align-items: center;
@@ -1931,6 +1997,11 @@ body {
   box-shadow: var(--widget-glow);
 }
 
+/* Narrower panel for login / signup (50% of the landing width). */
+.landing__panel--narrow {
+  width: min(473px, 94vw);
+}
+
 .landing__logo {
   filter: drop-shadow(0 0 14px rgba(29, 192, 156, 0.55));
 }
@@ -1987,6 +2058,174 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: var(--widget-gap);
   width: 100%;
+}
+
+/* Top-right identity badge on the public pages. */
+.auth-badge {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--widget-gap);
+  font-size: 13px;
+}
+
+.auth-badge--login {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.auth-badge--login:hover {
+  opacity: 1;
+}
+
+.auth-badge__welcome {
+  color: var(--color-primary);
+}
+
+.auth-badge__logout {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.auth-badge__logout:hover {
+  opacity: 1;
+}
+
+/* Login / signup form inside the shared panel. */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--widget-gap);
+  width: min(360px, 100%);
+}
+
+.auth-form__title {
+  color: var(--color-title);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.auth-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.auth-form__field input {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  outline: none;
+}
+
+.auth-form__error {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: color-mix(in srgb, var(--fixed-red) 22%, transparent);
+  color: var(--fixed-red);
+  font-size: 12px;
+}
+
+.auth-form__submit {
+  padding: 10px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--color-primary);
+  color: #06231d;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.auth-form__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.auth-form__submit:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.auth-form__alt {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.auth-form__alt a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.auth-form__alt a:hover {
+  text-decoration: underline;
+}
+
+/* Inline welcome line at the top of the explore right-stack (top-right). */
+.welcome-badge {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  font-size: 13px;
+}
+
+.welcome-badge__text {
+  color: var(--color-primary);
+}
+
+.welcome-badge__logout,
+.welcome-badge__login {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.welcome-badge__logout:hover,
+.welcome-badge__login:hover {
+  opacity: 1;
 }
 
 .landing__more {

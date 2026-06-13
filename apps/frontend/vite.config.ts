@@ -7,5 +7,13 @@ export default defineConfig({
   plugins: [react(), vesselsApiPlugin()],
   server: {
     port: 5173,
+    // Auth APIs go through the Node backend; everything under /api stays
+    // direct-from-DB via the vessels-api dev plugin.
+    proxy: {
+      '/auth': {
+        target: process.env.BACKEND_URL ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
   },
 });

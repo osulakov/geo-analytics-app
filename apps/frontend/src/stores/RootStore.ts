@@ -1,3 +1,4 @@
+import { AuthStore } from './AuthStore';
 import { ChatStore } from './ChatStore';
 import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
@@ -9,6 +10,7 @@ import { VesselStore } from './VesselStore';
 
 /** Aggregates all domain stores. New stores get wired in here. */
 export class RootStore {
+  auth: AuthStore;
   globe: GlobeStore;
   chat: ChatStore;
   ping: PingStore;
@@ -19,6 +21,7 @@ export class RootStore {
   event: EventStore;
 
   constructor() {
+    this.auth = new AuthStore();
     this.globe = new GlobeStore();
     this.chat = new ChatStore();
     this.ping = new PingStore();

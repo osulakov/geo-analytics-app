@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { AoisWidget } from '../components/AoisWidget';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
 import { DateRangeWidget } from '../components/DateRangeWidget';
@@ -23,6 +24,7 @@ import { TimeSlider } from '../components/TimeSlider';
 import { VesselModal } from '../components/VesselModal';
 import { VesselsWidget } from '../components/VesselsWidget';
 import { VesselTooltip } from '../layers_controller/VesselTooltip';
+import { WelcomeBadge } from '../components/WelcomeBadge';
 import { useStores } from '../stores/StoreContext';
 
 export function ExplorePage() {
@@ -97,6 +99,7 @@ export function ExplorePage() {
       <TimeSlider />
       <ChatWidget />
       <div className="right-stack">
+        <WelcomeBadge />
         <div className="right-stack__counters">
           <ShipCounter />
           <SatelliteCounter />
@@ -108,6 +111,7 @@ export function ExplorePage() {
         <Brand />
         <div className="stack-title stack-title--setup">Setup</div>
         <DateRangeWidget />
+        <AoisWidget />
         <div className="stack-title stack-title--results">Results</div>
         <VesselsWidget />
         <LayersWidget />

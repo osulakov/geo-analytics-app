@@ -125,6 +125,21 @@ export function vesselsApiPlugin(): Plugin {
   return {
     name: 'vessels-api',
     configureServer(server) {
+      // Verify the DB connection on startup and log the outcome.
+      const dbUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+      const dbLabel = dbUrl.replace(/\/\/[^@]*@/, '//***@'); // hide credentials
+      getPool()
+        .query('SELECT 1')
+        .then(() => {
+          console.log(`[vessels-api] ✓ Connected to database (${dbLabel})`);
+        })
+        .catch((error) => {
+          console.error(
+            `[vessels-api] ✗ Failed to connect to database (${dbLabel}):`,
+            error instanceof Error ? error.message : error,
+          );
+        });
+
       server.middlewares.use('/api', async (req, res, next) => {
         const url = new URL(req.url ?? '/', 'http://localhost');
         const { pathname } = url;

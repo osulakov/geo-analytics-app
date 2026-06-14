@@ -75,7 +75,6 @@ export class AnalysisStore {
         results.push({ analysisId: config.id, analysisName: config.name, rows });
         console.log(
           `[Run Job] ${config.name} — ${rows.length} rows (AOI: ${wkt ? 'scoped' : 'global'})`,
-          rows,
         );
       }
       runInAction(() => {

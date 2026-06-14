@@ -15,17 +15,30 @@ import { colorForMmsi, colorForMmsiAlpha } from './colorMap';
 import type { MapEvent } from '../data_loaders/events';
 import type { Satellite } from '../data_loaders/satellites';
 
-// Red geofence-event icon (the square SVG, recolored), drawn on the canvas.
+// Red geofence-event icon (the square SVG, recolored). The SVG is rasterized
+// once into an offscreen bitmap canvas — drawing an <img> SVG per marker is
+// very slow (it re-rasterizes each call), which freezes the globe when a job
+// produces thousands of events. Blitting the cached bitmap is fast.
 const GEOFENCE_COLOR = '#ef4444';
 const GEOFENCE_ICON_SIZE = 16;
-const geofenceIcon = new Image();
+// Rasterize at 2× for crisp downscaling on hi-dpi screens.
+const GEOFENCE_BITMAP_SIZE = GEOFENCE_ICON_SIZE * 2;
+const geofenceIconCanvas = document.createElement('canvas');
+geofenceIconCanvas.width = GEOFENCE_BITMAP_SIZE;
+geofenceIconCanvas.height = GEOFENCE_BITMAP_SIZE;
 let geofenceIconReady = false;
-geofenceIcon.onload = () => {
-  geofenceIconReady = true;
-};
-geofenceIcon.src =
-  'data:image/svg+xml;charset=utf-8,' +
-  encodeURIComponent(analyticsSquareRaw.replace(/currentColor/g, GEOFENCE_COLOR));
+{
+  const img = new Image();
+  img.onload = () => {
+    const c = geofenceIconCanvas.getContext('2d');
+    if (!c) return;
+    c.drawImage(img, 0, 0, GEOFENCE_BITMAP_SIZE, GEOFENCE_BITMAP_SIZE);
+    geofenceIconReady = true;
+  };
+  img.src =
+    'data:image/svg+xml;charset=utf-8,' +
+    encodeURIComponent(analyticsSquareRaw.replace(/currentColor/g, GEOFENCE_COLOR));
+}
 
 // AIS-off (gap) events: orange upward triangle drawn directly on the canvas.
 const AIS_OFF_COLOR = '#ef6a20';
@@ -685,7 +698,7 @@ export function GlobeCanvas({
           const projected = projection(coordinates);
           if (!projected) continue;
           const [x, y] = projected;
-          ctx.drawImage(geofenceIcon, x - half, y - half, GEOFENCE_ICON_SIZE, GEOFENCE_ICON_SIZE);
+          ctx.drawImage(geofenceIconCanvas, x - half, y - half, GEOFENCE_ICON_SIZE, GEOFENCE_ICON_SIZE);
 
           if (checkHover) {
             const dx = x - mouse.x;

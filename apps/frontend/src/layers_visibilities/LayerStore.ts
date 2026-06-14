@@ -11,10 +11,10 @@ import { ANALYSES } from '../analyses_configs';
  * (with its "pings" sublayer) is a built-in, controlled from the Data widget.
  */
 export class LayerStore {
-  /** Master switch for the Device-tracks layer group. */
-  deviceTracksVisible = true;
+  /** Master switch for the Device-tracks layer group (off by default). */
+  deviceTracksVisible = false;
   /** Sublayer: latest ping markers. */
-  pingsVisible = true;
+  pingsVisible = false;
   /** Whether the Device-tracks sublayers are expanded (collapsed by default). */
   deviceTracksExpanded = false;
 
@@ -67,10 +67,9 @@ export class LayerStore {
     this.deviceTracksExpanded = !this.deviceTracksExpanded;
   }
 
-  /** Turn every layer on (used after a job run reveals the results). */
+  /** Reveal the analysis event layers after a job run. Device tracks are left
+   *  as-is (off by default) — only the configured event layers are turned on. */
   showAll(): void {
-    this.deviceTracksVisible = true;
-    this.pingsVisible = true;
     for (const analysis of ANALYSES) {
       for (const layer of analysis.layers_config) this.visibleLayers.add(layer.id);
     }

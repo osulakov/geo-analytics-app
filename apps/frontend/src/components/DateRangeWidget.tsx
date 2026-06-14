@@ -8,7 +8,7 @@ import { useStores } from '../stores/StoreContext';
  * is applied (and the map reloaded) only when Apply is pressed.
  */
 export const DateRangeWidget = observer(function DateRangeWidget() {
-  const { ping, event } = useStores();
+  const { ping } = useStores();
   const [open, setOpen] = useState(false);
   const [fromDraft, setFromDraft] = useState(ping.fromDate);
   const [toDraft, setToDraft] = useState(ping.toDate);
@@ -36,7 +36,6 @@ export const DateRangeWidget = observer(function DateRangeWidget() {
 
   const apply = () => {
     ping.applyRange(fromDraft, toDraft);
-    void event.load(ping.rangeStartIso, ping.rangeEndIso, ping.viewport);
     setOpen(false);
   };
 

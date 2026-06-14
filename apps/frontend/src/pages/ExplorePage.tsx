@@ -65,7 +65,8 @@ export function ExplorePage() {
     maxBucket: number;
   }) => {
     stores.ping.setViewport(cap);
-    void stores.event.load(stores.ping.rangeStartIso, stores.ping.rangeEndIso, cap);
+    // Events are not fetched from the DB for the map; they come only from a job
+    // run (Run Job → the analysis' produced events).
   };
 
   const handleSelect = (mmsi: string) => {

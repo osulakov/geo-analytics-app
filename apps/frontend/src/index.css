@@ -257,6 +257,22 @@ body {
   gap: var(--widget-gap);
 }
 
+/* The layout containers span the tallest column's full height; left transparent
+   they'd still swallow clicks in their empty areas (e.g. below a short column).
+   Make the containers click-through and re-enable only the widget panels, so
+   each column is effectively bounded by its widgets and the globe stays usable. */
+.left-region,
+.left-region__body,
+.left-stack {
+  pointer-events: none;
+}
+
+.left-region > .brand,
+.left-region__body > .widget-toolbar,
+.left-stack > * {
+  pointer-events: auto;
+}
+
 /* Run Job widget: a panel with centered Run / Save buttons on one line. */
 .run-job {
   display: flex;
@@ -454,6 +470,12 @@ body {
   display: flex;
   align-self: flex-end;
   gap: var(--element-gap);
+}
+
+/* Drop the Data widget down so it lines up with the Date Range widget on the
+   left (which sits below the taller brand/logo block). */
+.right-stack > .data-widget {
+  margin-top: 36px;
 }
 
 /* Section titles in the left stack, sitting outside the widget panels. */

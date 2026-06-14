@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
+import { aoisToWkt } from '../analyses_configs/wkt';
 import { SaveJobModal } from './SaveJobModal';
 
 /**
@@ -20,6 +21,19 @@ export const RunJobWidget = observer(function RunJobWidget() {
     await analysis.run(aoi.aois, ping.rangeStartIso ?? null, ping.rangeEndIso ?? null);
     // Show only the job's produced events on the map (no DB fetch).
     event.setJobEvents(analysis.resultEvents);
+
+    // If any run analysis declares an aoi_bounded device-tracks layer, fetch
+    // device tracks for the selected AOIs only (separate from the global
+    // device-tracks layer controlled by the Data widget).
+    const wantsAoiTracks = analysis.addedConfigs.some((config) =>
+      config.layers_config.some((layer) => layer.config?.aoi_bounded),
+    );
+    if (wantsAoiTracks) {
+      await ping.loadAoiDeviceTracks(aoisToWkt(aoi.aois));
+    } else {
+      ping.clearAoiDeviceTracks();
+    }
+
     layers.showAll();
   };
 

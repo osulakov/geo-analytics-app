@@ -237,6 +237,7 @@ body {
   left: 20px;
   z-index: 20;
   max-height: calc(100vh - 40px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--widget-gap);
@@ -246,15 +247,22 @@ body {
   display: flex;
   align-items: flex-start;
   gap: var(--widget-gap);
+  flex: 1;
   min-height: 0;
 }
 
 .left-stack {
+  align-self: stretch;
   width: 21.5625vw;
   min-width: 242px;
+  min-height: 0;
+  /* Scroll the first widgets column when it's taller than the viewport. */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--widget-gap);
+  /* Room so the widgets' glow isn't clipped by the scroll container. */
+  padding: 2px;
 }
 
 /* The layout containers span the tallest column's full height; left transparent
@@ -1206,6 +1214,44 @@ body {
   flex-direction: column;
   gap: var(--element-gap);
   padding: 0 var(--widget-padding) var(--element-gap);
+}
+
+/* A saved-job row in the Recent jobs list (click to re-open the job). */
+.recent-job-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  width: 100%;
+  padding: var(--element-gap) var(--element-padding-y);
+  border: none;
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.recent-job-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.recent-job-row:disabled {
+  cursor: default;
+  opacity: var(--disabled-opacity);
+}
+
+.recent-job-row__name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-job-row__meta {
+  font-size: 11px;
+  opacity: 0.6;
 }
 
 .data-widget__section-header {

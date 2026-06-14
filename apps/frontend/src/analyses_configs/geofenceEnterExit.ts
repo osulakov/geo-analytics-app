@@ -20,7 +20,8 @@ export const geofenceEnterExit: AnalysisConfig = {
   description:
     'Vessels crossing EEZ boundaries within the selected AOI, or globally when no AOI is set.',
   eventType: 'geofence_enter_exit',
-  // Crossings are drawn as red square icons on the map.
+  // Crossings are drawn as red square icons; the device tracks that produced
+  // them are shown as yellow triangles, fetched for the selected AOIs only.
   layers_config: [
     {
       id: 'geofence',
@@ -28,6 +29,14 @@ export const geofenceEnterExit: AnalysisConfig = {
       type: 'ICON',
       icon: 'square',
       color: '#ef4444',
+    },
+    {
+      id: 'device-tracks',
+      name: 'Device tracks',
+      type: 'ICON',
+      icon: 'triangle',
+      color: '#facc15',
+      config: { aoi_bounded: true },
     },
   ],
   buildQuery(wkt, fromIso = null, toIso = null) {

@@ -644,6 +644,33 @@ export function GlobeCanvas({
         }
       }
 
+      // AOI-bounded device tracks from a job (separate from the global pings
+      // layer above; controlled by the configured 'device-tracks' layer toggle).
+      if (layerStore.isLayerVisible('device-tracks')) {
+        for (const ping of pingStore.aoiPings) {
+          const coordinates: [number, number] = [ping.lon, ping.lat];
+          if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+          const projected = projection(coordinates);
+          if (!projected) continue;
+          const [x, y] = projected;
+
+          ctx.beginPath();
+          ctx.arc(x, y, RECENT_PING_RADIUS, 0, 2 * Math.PI);
+          ctx.fillStyle = colorForMmsi(ping.mmsi);
+          ctx.fill();
+
+          if (checkHover) {
+            const dx = x - mouse.x;
+            const dy = y - mouse.y;
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < nearestDist2) {
+              nearestDist2 = dist2;
+              nearest = { mmsi: ping.mmsi, x, y, ts: ping.ts, heading: ping.heading };
+            }
+          }
+        }
+      }
+
       // Highlight the hovered ping on top (its own color, larger, white ring).
       if (nearest) {
         ctx.beginPath();

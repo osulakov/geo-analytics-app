@@ -9,6 +9,15 @@ export type LayerKind = 'ICON';
 /** Icon shape for `type: 'ICON'` layers. */
 export type LayerIconShape = 'square' | 'triangle';
 
+/** Optional behavioral config for a layer. */
+export interface LayerOptions {
+  /**
+   * When true, the layer's data is fetched for the selected AOIs only (rather
+   * than globally / by viewport). E.g. device tracks bounded to the AOIs.
+   */
+  aoi_bounded?: boolean;
+}
+
 /**
  * A map layer contributed by an analysis. The Layers widget is built entirely
  * from these (one toggle row per layer); the map renderer reads each layer's
@@ -25,6 +34,8 @@ export interface LayerConfig {
   icon: LayerIconShape;
   /** Icon / marker color (matches what the map draws). */
   color: string;
+  /** Optional behavioral config (e.g. AOI-bounded data fetching). */
+  config?: LayerOptions;
 }
 
 /**

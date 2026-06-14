@@ -69,6 +69,46 @@ export async function fetchLatestPing(
   return (await response.json()) as LatestPing | null;
 }
 
+/**
+ * Latest ping per vessel inside an AOI polygon (WKT, WGS84) over a date range —
+ * the AOI-bounded "device tracks" produced by a job. Uses the read-only query
+ * endpoint; ST_Intersects on geography hits the position GiST index.
+ */
+export async function fetchAoiDeviceTracks(
+  wkt: string,
+  fromIso?: string | null,
+  toIso?: string | null,
+): Promise<LatestPing[]> {
+  const sql = `
+    SELECT DISTINCT ON (mmsi)
+           mmsi,
+           ts,
+           ST_X(position::geometry) AS lon,
+           ST_Y(position::geometry) AS lat,
+           heading
+      FROM ais_pings
+     WHERE ST_Intersects(position, ST_GeomFromText($1, 4326)::geography)
+       AND ($2::timestamptz IS NULL OR ts >= $2::timestamptz)
+       AND ($3::timestamptz IS NULL OR ts <= $3::timestamptz)
+     ORDER BY mmsi, ts DESC`;
+  const response = await fetch('/api/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql, params: [wkt, fromIso ?? null, toIso ?? null] }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch AOI device tracks: ${response.status}`);
+  }
+  const rows = (await response.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    mmsi: String(r.mmsi),
+    ts: String(r.ts),
+    lon: Number(r.lon),
+    lat: Number(r.lat),
+    heading: r.heading == null ? null : Number(r.heading),
+  }));
+}
+
 /** Count of distinct vessels with any ping in the given date range. */
 export async function fetchActiveVesselCount(
   fromIso?: string,

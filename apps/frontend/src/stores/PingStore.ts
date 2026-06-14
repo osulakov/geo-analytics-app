@@ -3,6 +3,7 @@ import { makeAutoObservable, observable, runInAction } from 'mobx';
 import {
   fetchActiveVesselCount,
   fetchAllPings,
+  fetchAoiDeviceTracks,
   fetchLatestPing,
   fetchVesselTrack,
   type LatestPing,
@@ -105,6 +106,11 @@ export class PingStore {
   // it falls outside the current viewport sample / pagination.
   focusedPing: TimedPing | null = null;
 
+  // AOI-bounded device tracks produced by a job (an analysis whose layers_config
+  // declares an aoi_bounded device-tracks layer). Kept SEPARATE from the global
+  // device-tracks / viewport pings above so the two never interfere.
+  aoiPings: LatestPing[] = [];
+
   // Groups currently shown on the map (eye toggle on); multi-select. The
   // rendered tracks are the union of these groups' members + shownTrackMmsis.
   shownGroupIds: number[] = [];
@@ -131,8 +137,33 @@ export class PingStore {
       allPings: observable.ref,
       basePings: observable.ref,
       pings: observable.ref,
+      aoiPings: observable.ref,
       filterMmsis: observable.ref,
     });
+  }
+
+  /** Load AOI-bounded device tracks (latest ping per vessel inside the AOIs)
+   *  for a job, or clear them when there's no AOI. Independent of the global
+   *  device-tracks layer. */
+  async loadAoiDeviceTracks(wkt: string | null): Promise<void> {
+    if (!wkt) {
+      runInAction(() => {
+        this.aoiPings = [];
+      });
+      return;
+    }
+    try {
+      const pings = await fetchAoiDeviceTracks(wkt, this.rangeStartIso, this.rangeEndIso);
+      runInAction(() => {
+        this.aoiPings = pings;
+      });
+    } catch (error) {
+      console.error('Failed to load AOI device tracks:', error);
+    }
+  }
+
+  clearAoiDeviceTracks(): void {
+    this.aoiPings = [];
   }
 
   get rangeStartIso(): string {

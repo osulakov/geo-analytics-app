@@ -90,4 +90,35 @@ export class AnalysisStore {
       });
     }
   }
+
+  /**
+   * Re-run a single saved job: execute its analysis' query against the stored
+   * AOI WKT + date range, store the result, and return the produced events.
+   * (Saved jobs persist only metadata, so the events are recomputed.)
+   */
+  async runConfig(
+    analysisConfigId: string,
+    wkt: string | null,
+    fromIso: string | null,
+    toIso: string | null,
+  ): Promise<MapEvent[]> {
+    const config = ANALYSES.find((a) => a.id === analysisConfigId);
+    if (!config || this.running) return [];
+    this.running = true;
+    try {
+      const { sql, params } = config.buildQuery(wkt, fromIso, toIso);
+      const rows = await runQuery(sql, params);
+      runInAction(() => {
+        this.lastResults = [{ analysisId: config.id, analysisName: config.name, rows }];
+      });
+      return this.resultEvents;
+    } catch (error) {
+      console.error('Open Job failed:', error);
+      return [];
+    } finally {
+      runInAction(() => {
+        this.running = false;
+      });
+    }
+  }
 }

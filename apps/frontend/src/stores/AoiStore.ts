@@ -39,6 +39,33 @@ function normalizeWinding(coords: [number, number][]): [number, number][] {
 const isServerId = (id: string): boolean => /^\d+$/.test(id);
 
 /**
+ * Parse a POLYGON / MULTIPOLYGON WKT (as produced by aoisToWkt) back into rings
+ * of [lon, lat] pairs, dropping each ring's closing duplicate point. Assumes
+ * simple single-ring polygons (no holes), which is what this app produces.
+ */
+function parseWktRings(wkt: string): [number, number][][] {
+  const rings: [number, number][][] = [];
+  // Each innermost "(lon lat, lon lat, …)" group is one ring.
+  for (const group of wkt.match(/\(([^()]+)\)/g) ?? []) {
+    const coords = group
+      .slice(1, -1)
+      .split(',')
+      .map((pair) => pair.trim().split(/\s+/).map(Number) as [number, number])
+      .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    // Drop the closing duplicate point if present.
+    if (
+      coords.length >= 2 &&
+      coords[0][0] === coords[coords.length - 1][0] &&
+      coords[0][1] === coords[coords.length - 1][1]
+    ) {
+      coords.pop();
+    }
+    if (coords.length >= 3) rings.push(coords);
+  }
+  return rings;
+}
+
+/**
  * Areas of Interest drawn on the globe. AOIs live only in this store (temporary
  * for the session); the user can explicitly save any of them to their library
  * in the DB (`POST /aois`, scoped to their user id) without removing them here.
@@ -133,6 +160,27 @@ export class AoiStore {
     ];
     this.drawing = false;
     this.draftPoints = [];
+  }
+
+  /** Replace the Added list with the AOIs encoded in a job's WKT (or clear it
+   *  when the job was global). Used when opening a saved job. */
+  setFromWkt(wkt: string | null): void {
+    this.cancelDrawing();
+    if (!wkt) {
+      this.aois = [];
+      return;
+    }
+    this.aois = parseWktRings(wkt).map((coords, i) => {
+      const coordinates = normalizeWinding(coords);
+      return {
+        id: `job-aoi-${Date.now()}-${i}`,
+        name: `AOI ${i + 1}`,
+        coordinates,
+        areaKm2: (ringSteradians(coordinates) * EARTH_RADIUS_M * EARTH_RADIUS_M) / 1e6,
+        saved: false,
+        saving: false,
+      };
+    });
   }
 
   /** Update an AOI's name locally as the user types (no network call). */

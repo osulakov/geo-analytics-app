@@ -155,7 +155,7 @@ export function ExplorePage() {
             {showNewJob && <AoisWidget />}
             {showNewJob && <AnalysesWidget />}
             {showNewJob && <RunJobWidget />}
-            {showRecentJobs && <RecentJobsWidget />}
+            {showRecentJobs && <RecentJobsWidget onOpened={() => setActiveNav('newJob')} />}
             {/* Vessels widget is shown with a recent job (later). */}
             {/* <VesselsWidget /> */}
           </div>

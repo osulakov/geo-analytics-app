@@ -21,6 +21,8 @@ export const RunJobWidget = observer(function RunJobWidget() {
     await analysis.run(aoi.aois, ping.rangeStartIso ?? null, ping.rangeEndIso ?? null);
     // Show only the job's produced events on the map (no DB fetch).
     event.setJobEvents(analysis.resultEvents);
+    // Drop any full paths from a previous job.
+    ping.clearJobTracks();
 
     // If any run analysis declares an aoi_bounded device-tracks layer, fetch
     // device tracks for the selected AOIs only (separate from the global

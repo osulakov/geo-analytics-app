@@ -17,8 +17,13 @@ function formatDate(iso: string | null): string {
  * re-runs its analysis (events aren't persisted) and shows the results on the
  * map. Collapsed by default; expands on the chevron or on typing.
  */
-export const RecentJobsWidget = observer(function RecentJobsWidget() {
-  const { job, analysis, event, ping, layers } = useStores();
+export const RecentJobsWidget = observer(function RecentJobsWidget({
+  onOpened,
+}: {
+  /** Called after a job is opened (e.g. to switch back to the New-job view). */
+  onOpened?: () => void;
+}) {
+  const { job, analysis, event, ping, aoi, layers } = useStores();
   const [expanded, setExpanded] = useState(true);
   const [query, setQuery] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -41,6 +46,14 @@ export const RecentJobsWidget = observer(function RecentJobsWidget() {
   const handleOpen = async (saved: Job) => {
     setOpeningId(saved.id);
     try {
+      // Restore the job's parameters into the New-job widgets + map.
+      if (saved.fromIso && saved.toIso) {
+        ping.applyRange(saved.fromIso.slice(0, 10), saved.toIso.slice(0, 10));
+      }
+      aoi.setFromWkt(saved.aoiWkt);
+      analysis.setAdded([saved.analysisConfigId]);
+
+      // Re-run the analysis and show its results.
       const events = await analysis.runConfig(
         saved.analysisConfigId,
         saved.aoiWkt,
@@ -48,6 +61,8 @@ export const RecentJobsWidget = observer(function RecentJobsWidget() {
         saved.toIso,
       );
       event.setJobEvents(events);
+      // Drop any full paths from a previously-opened job.
+      ping.clearJobTracks();
 
       // AOI-bounded device tracks, if the job's analysis declares them.
       const config = ANALYSES.find((a) => a.id === saved.analysisConfigId);
@@ -57,6 +72,7 @@ export const RecentJobsWidget = observer(function RecentJobsWidget() {
         ping.clearAoiDeviceTracks();
       }
       layers.showAll();
+      onOpened?.();
     } finally {
       setOpeningId(null);
     }

@@ -618,6 +618,36 @@ export function GlobeCanvas({
         }
       }
 
+      // Job device-tracks full paths (loaded via the layer's path button),
+      // drawn as individual pings under the configured 'device-tracks' layer.
+      if (layerStore.isLayerVisible('device-tracks')) {
+        for (const tr of pingStore.jobTracks) {
+          ctx.fillStyle = colorForMmsi(tr.mmsi);
+          for (const point of tr.points) {
+            const pt = Date.parse(point.ts);
+            if (pt < winStart || pt > winEnd) continue;
+            const coordinates: [number, number] = [point.lon, point.lat];
+            if (geoDistance(coordinates, center) > Math.PI / 2) continue;
+            const projected = projection(coordinates);
+            if (!projected) continue;
+            const [x, y] = projected;
+            ctx.beginPath();
+            ctx.arc(x, y, PING_RADIUS, 0, 2 * Math.PI);
+            ctx.fill();
+
+            if (checkHover) {
+              const dx = x - mouse.x;
+              const dy = y - mouse.y;
+              const dist2 = dx * dx + dy * dy;
+              if (dist2 < nearestDist2) {
+                nearestDist2 = dist2;
+                nearest = { mmsi: tr.mmsi, x, y, ts: point.ts, heading: point.heading };
+              }
+            }
+          }
+        }
+      }
+
       // Latest vessel pings (the "pings" sublayer of Device tracks).
       if (layerStore.pingsActive) {
         for (const ping of pingStore.pings) {

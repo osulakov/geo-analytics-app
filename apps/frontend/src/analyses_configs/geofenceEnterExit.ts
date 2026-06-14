@@ -1,4 +1,4 @@
-import type { AnalysisConfig } from './types';
+import type { AnalysisConfig } from "./types";
 
 /**
  * EEZ geofence enter/exit detection.
@@ -15,28 +15,28 @@ import type { AnalysisConfig } from './types';
  * dynamic details payload (the crossed EEZ name).
  */
 export const geofenceEnterExit: AnalysisConfig = {
-  id: 'geofence-enter-exit',
-  name: 'EEZ Geofence Crossings (Enter / Exit)',
+  id: "geofence-enter-exit",
+  name: "EEZ Geofence Crossings (Enter / Exit)",
   description:
-    'Vessels crossing EEZ boundaries within the selected AOI, or globally when no AOI is set.',
-  eventType: 'geofence_enter_exit',
+    "Vessels crossing EEZ boundaries within the selected AOI, or globally when no AOI is set.",
+  eventType: "geofence_enter_exit",
   // Crossings are drawn as red square icons; the device tracks that produced
   // them are shown as yellow triangles, fetched for the selected AOIs only.
   layers_config: [
     {
-      id: 'geofence',
-      name: 'Geofence (Enter/Exit)',
-      type: 'ICON',
-      icon: 'square',
-      color: '#ef4444',
+      id: "geofence",
+      name: "Geofence (Enter/Exit)",
+      type: "ICON",
+      icon: "square",
+      color: "#ef4444",
     },
     {
-      id: 'device-tracks',
-      name: 'Device tracks',
-      type: 'ICON',
-      icon: 'triangle',
-      color: '#facc15',
-      config: { aoi_bounded: true },
+      id: "device-tracks",
+      name: "Device tracks",
+      type: "ICON",
+      icon: "triangle",
+      color: "#facc15",
+      config: { aoi_bounded: true, can_get_full_path: true },
     },
   ],
   buildQuery(wkt, fromIso = null, toIso = null) {

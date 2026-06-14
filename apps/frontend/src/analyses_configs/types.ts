@@ -5,9 +5,9 @@ export interface AnalysisQuery {
 }
 
 /** How a layer is drawn on the map / shown in the legend. */
-export type LayerKind = 'ICON';
+export type LayerKind = "ICON";
 /** Icon shape for `type: 'ICON'` layers. */
-export type LayerIconShape = 'square' | 'triangle';
+export type LayerIconShape = "square" | "triangle";
 
 /** Optional behavioral config for a layer. */
 export interface LayerOptions {
@@ -16,6 +16,7 @@ export interface LayerOptions {
    * than globally / by viewport). E.g. device tracks bounded to the AOIs.
    */
   aoi_bounded?: boolean;
+  can_get_full_path?: boolean;
 }
 
 /**
@@ -58,5 +59,9 @@ export interface AnalysisConfig {
    * @param fromIso Inclusive start of the date range, or null for unbounded.
    * @param toIso   Inclusive end of the date range, or null for unbounded.
    */
-  buildQuery(wkt: string | null, fromIso?: string | null, toIso?: string | null): AnalysisQuery;
+  buildQuery(
+    wkt: string | null,
+    fromIso?: string | null,
+    toIso?: string | null,
+  ): AnalysisQuery;
 }

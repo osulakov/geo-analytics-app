@@ -111,6 +111,12 @@ export class PingStore {
   // device-tracks / viewport pings above so the two never interfere.
   aoiPings: LatestPing[] = [];
 
+  // Full paths for the vessels involved in a job's events (loaded on demand via
+  // the device-tracks layer's "show full paths" button). Separate from `tracks`
+  // (used by the vessels widget / groups).
+  jobTracks: VesselTrack[] = [];
+  jobTracksController: AbortController | null = null;
+
   // Groups currently shown on the map (eye toggle on); multi-select. The
   // rendered tracks are the union of these groups' members + shownTrackMmsis.
   shownGroupIds: number[] = [];
@@ -134,10 +140,12 @@ export class PingStore {
       loadController: false,
       baseController: false,
       tracksController: false,
+      jobTracksController: false,
       allPings: observable.ref,
       basePings: observable.ref,
       pings: observable.ref,
       aoiPings: observable.ref,
+      jobTracks: observable.ref,
       filterMmsis: observable.ref,
     });
   }
@@ -367,6 +375,40 @@ export class PingStore {
     this.shownGroupIds = [];
     this.shownGroupMmsis = [];
     this.shownTrackMmsis = [];
+  }
+
+  /** Load full paths for the vessels involved in a job's events (its device
+   *  tracks). Stored separately from `tracks` so it doesn't disturb the
+   *  vessels-widget / group tracks. */
+  async showJobTracks(mmsis: string[]): Promise<void> {
+    this.jobTracksController?.abort();
+    const controller = new AbortController();
+    this.jobTracksController = controller;
+    try {
+      const results = await Promise.all(
+        mmsis.map(async (mmsi) => ({
+          mmsi,
+          points: await fetchVesselTrack(mmsi, this.rangeStartIso, this.rangeEndIso, controller.signal),
+        })),
+      );
+      if (this.jobTracksController !== controller) return;
+      runInAction(() => {
+        this.jobTracks = results;
+      });
+    } catch (error) {
+      if (!isAbort(error)) console.error('Failed to load job tracks:', error);
+    }
+  }
+
+  clearJobTracks(): void {
+    this.jobTracksController?.abort();
+    this.jobTracksController = null;
+    this.jobTracks = [];
+  }
+
+  /** Whether the job's full paths are currently loaded/shown. */
+  get hasJobTracks(): boolean {
+    return this.jobTracks.length > 0;
   }
 
   setHighlight(mmsi: string | null): void {

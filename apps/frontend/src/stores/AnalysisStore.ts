@@ -38,6 +38,11 @@ export class AnalysisStore {
     this.added = this.added.filter((x) => x !== id);
   }
 
+  /** Replace the Added list with the given analysis ids (known ones only). */
+  setAdded(ids: string[]): void {
+    this.added = ids.filter((id) => ANALYSES.some((a) => a.id === id));
+  }
+
   get addedConfigs(): AnalysisConfig[] {
     return this.added
       .map((id) => ANALYSES.find((a) => a.id === id))

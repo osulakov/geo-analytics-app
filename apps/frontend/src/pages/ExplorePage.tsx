@@ -4,6 +4,7 @@ import HistoryIcon from '@mui/icons-material/History';
 
 import { AnalysesWidget } from '../components/AnalysesWidget';
 import { AoisWidget } from '../components/AoisWidget';
+import { AppliedJobsBar } from '../components/AppliedJobsBar';
 import { AoiTooltip } from '../layers_controller/AoiTooltip';
 import { Brand } from '../components/Brand';
 import { ChatWidget } from '../components/ChatWidget';
@@ -151,16 +152,16 @@ export function ExplorePage() {
             </button>
           </div>
           <div className="left-stack">
+            {showNewJob && <AppliedJobsBar />}
             {showNewJob && <DateRangeWidget />}
             {showNewJob && <AoisWidget />}
             {showNewJob && <AnalysesWidget />}
             {showNewJob && <RunJobWidget />}
-            {showRecentJobs && <RecentJobsWidget onOpened={() => setActiveNav('newJob')} />}
-            {/* Vessels widget is shown with a recent job (later). */}
-            {/* <VesselsWidget /> */}
+            {showRecentJobs && <RecentJobsWidget />}
           </div>
-          {/* Second column: Layers for the job results, after a run. */}
-          {showNewJob && <JobResultsColumn />}
+          {/* Second column: Layers + Vessels for the applied job results, in
+              both views (renders only when there are results). */}
+          <JobResultsColumn />
         </div>
       </div>
       {satHover && !selected && (

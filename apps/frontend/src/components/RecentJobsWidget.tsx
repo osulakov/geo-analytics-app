@@ -3,7 +3,7 @@ import { observer } from 'mobx-react-lite';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 
 import { useStores } from '../stores/StoreContext';
-import { ANALYSES } from '../analyses_configs';
+import { useApplyJobs } from './useApplyJobs';
 import type { Job } from '../stores/JobStore';
 
 /** Format an ISO timestamp as a short local date. */
@@ -15,16 +15,12 @@ function formatDate(iso: string | null): string {
 
 /**
  * Recent jobs widget: lists the signed-in user's saved jobs. Clicking one
- * re-runs its analysis (events aren't persisted) and shows the results on the
- * map. Collapsed by default; expands on the chevron or on typing.
+ * applies it — its results combine with any other applied jobs on the map —
+ * and stays on this view. Collapsed by default; expands on the chevron/typing.
  */
-export const RecentJobsWidget = observer(function RecentJobsWidget({
-  onOpened,
-}: {
-  /** Called after a job is opened (e.g. to switch back to the New-job view). */
-  onOpened?: () => void;
-}) {
-  const { job, analysis, event, ping, aoi, layers } = useStores();
+export const RecentJobsWidget = observer(function RecentJobsWidget() {
+  const { job } = useStores();
+  const applyJobs = useApplyJobs();
   const [expanded, setExpanded] = useState(true);
   const [query, setQuery] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -48,71 +44,11 @@ export const RecentJobsWidget = observer(function RecentJobsWidget({
   // When collapsed with applied jobs, the Applied list replaces the search box.
   const showSearch = expanded || !hasApplied;
 
-  /** Apply (combine) the given jobs: union date range, combined events, and
-   *  merged AOI device tracks. Clears everything when there are none. */
-  const applyJobs = async (jobs: Job[]) => {
-    if (jobs.length === 0) {
-      // Removing the last applied job empties the New-job widgets + map too.
-      event.clearJob();
-      ping.clearAoiDeviceTracks();
-      ping.clearJobTracks();
-      analysis.reset();
-      aoi.setFromWkt(null);
-      layers.clearLayers();
-      return;
-    }
-
-    // Global date range = union of all applied jobs' ranges.
-    const froms = jobs.map((j) => j.fromIso).filter((x): x is string => Boolean(x));
-    const tos = jobs.map((j) => j.toIso).filter((x): x is string => Boolean(x));
-    if (froms.length > 0 && tos.length > 0) {
-      const minFrom = froms.reduce((a, b) => (a < b ? a : b));
-      const maxTo = tos.reduce((a, b) => (a > b ? a : b));
-      ping.applyRange(minFrom.slice(0, 10), maxTo.slice(0, 10));
-    }
-
-    // Run each job's analysis and combine the produced events.
-    const events = await analysis.runJobs(
-      jobs.map((j) => ({
-        analysisConfigId: j.analysisConfigId,
-        wkt: j.aoiWkt,
-        fromIso: j.fromIso,
-        toIso: j.toIso,
-        settings: j.analysisConfig ?? undefined,
-      })),
-    );
-    event.setJobEvents(events);
-    ping.clearJobTracks();
-
-    // Merge AOI device tracks across the jobs whose analyses declare them.
-    const aoiJobs = jobs
-      .filter((j) => {
-        const config = ANALYSES.find((a) => a.id === j.analysisConfigId);
-        return config?.layers_config.some((layer) => layer.config?.aoi_bounded);
-      })
-      .map((j) => ({ wkt: j.aoiWkt, mmsis: j.analysisConfig?.mmsis ?? [] }));
-    if (aoiJobs.length > 0) {
-      await ping.loadAoiDeviceTracksForJobs(aoiJobs);
-    } else {
-      ping.clearAoiDeviceTracks();
-    }
-
-    layers.showAll();
-  };
-
   const handleOpen = async (saved: Job) => {
     setOpeningId(saved.id);
     try {
       job.apply(saved);
-      // Restore the clicked job's params into the New-job widgets (for Save As).
-      aoi.setFromWkt(saved.aoiWkt);
-      analysis.setAdded([saved.analysisConfigId]);
-      analysis.setOpenedJobName(saved.name);
-      if (saved.analysisConfig) analysis.setSettings(saved.analysisConfigId, saved.analysisConfig);
-
-      // Combine all applied jobs on the map.
       await applyJobs(job.applied);
-      onOpened?.();
     } finally {
       setOpeningId(null);
     }

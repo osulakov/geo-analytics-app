@@ -29,6 +29,8 @@ export class JobStore {
   jobs: Job[] = [];
   /** Jobs the user has opened/applied this session (most recent first). */
   applied: Job[] = [];
+  /** The applied job currently loaded into the create widgets for editing. */
+  editingId: string | null = null;
 
   constructor(private auth: AuthStore) {
     makeAutoObservable(this, { auth: false } as never);
@@ -49,11 +51,23 @@ export class JobStore {
 
   unapply(id: string): void {
     this.applied = this.applied.filter((j) => j.id !== id);
+    if (this.editingId === id) this.editingId = null;
+  }
+
+  /** Replace an applied job's fields (used to re-run an edited job in place). */
+  updateApplied(id: string, patch: Partial<Job>): void {
+    this.applied = this.applied.map((j) => (j.id === id ? { ...j, ...patch } : j));
+  }
+
+  /** The applied job being edited in the create widgets, if any. */
+  setEditing(id: string | null): void {
+    this.editingId = id;
   }
 
   /** Drop all applied jobs (Discard). */
   clearApplied(): void {
     this.applied = [];
+    this.editingId = null;
   }
 
   /** Fetch the signed-in user's saved jobs into `jobs`. */

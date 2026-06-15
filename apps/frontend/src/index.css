@@ -1447,6 +1447,31 @@ body {
 }
 
 /* Shortened applied-job row: clickable name + remove. */
+/* Applied-jobs bar at the top of the create view. */
+.applied-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.applied-bar__label {
+  color: var(--color-title);
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.applied-bar__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+}
+
 .applied-job-row {
   display: flex;
   align-items: center;
@@ -1454,6 +1479,10 @@ body {
   padding: var(--element-gap) var(--element-padding-y);
   border-radius: var(--element-radius);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.applied-job-row.is-editing {
+  background: var(--accent-soft);
 }
 
 .applied-job-row__name {

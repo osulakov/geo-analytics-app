@@ -3,26 +3,28 @@ import { observer } from 'mobx-react-lite';
 
 import { useStores } from '../stores/StoreContext';
 import { aoisToWkt } from '../analyses_configs/wkt';
+import { useApplyJobs } from './useApplyJobs';
 import { SaveJobModal } from './SaveJobModal';
 
 /**
- * Run Job widget: runs the selected (Added) analyses against the DB, scoped to
- * the Added AOIs (or the whole world if none) and the global date range. After a
- * run, all layers are turned on and a Save Job action appears.
+ * Run Job widget. Running adds/updates a job in the applied set and re-combines
+ * the map: if a job is being edited (loaded from the applied list) it's updated
+ * in place; otherwise the run is added as a new draft alongside the applied
+ * jobs. Save persists the current job; Discard wipes everything.
  */
 export const RunJobWidget = observer(function RunJobWidget() {
   const { analysis, aoi, ping, layers, event, job } = useStores();
+  const applyJobs = useApplyJobs();
   const [saveOpen, setSaveOpen] = useState(false);
 
   const disabled = analysis.running || analysis.addedConfigs.length === 0;
   const hasResults = analysis.lastResults.length > 0;
   const canDiscard =
-    hasResults ||
-    job.applied.length > 0 ||
-    analysis.added.length > 0 ||
-    aoi.aois.length > 0;
+    hasResults || job.applied.length > 0 || analysis.added.length > 0 || aoi.aois.length > 0;
 
-  /** Wipe all applied/opened jobs, results and the job-creation widgets. */
+  // Editing a saved job → "Save As"; a fresh/draft job → "Save Job".
+  const editingSaved = job.editingId !== null && !job.editingId.startsWith('draft-');
+
   const handleDiscard = () => {
     job.clearApplied();
     analysis.reset();
@@ -34,38 +36,37 @@ export const RunJobWidget = observer(function RunJobWidget() {
   };
 
   const handleRun = async () => {
-    await analysis.run(aoi.aois, ping.rangeStartIso ?? null, ping.rangeEndIso ?? null);
-    // Show only the job's produced events on the map (no DB fetch).
-    event.setJobEvents(analysis.resultEvents);
-    // Drop any full paths from a previous job.
-    ping.clearJobTracks();
-
-    // If any run analysis declares an aoi_bounded device-tracks layer, fetch
-    // device tracks for the selected AOIs only (separate from the global
-    // device-tracks layer controlled by the Data widget).
-    const aoiConfigs = analysis.addedConfigs.filter((config) =>
-      config.layers_config.some((layer) => layer.config?.aoi_bounded),
-    );
-    if (aoiConfigs.length > 0) {
-      // Scope the job's device tracks to the analyses' selected vessels (if any).
-      const mmsis = [...new Set(aoiConfigs.flatMap((c) => analysis.getSettings(c.id).mmsis))];
-      await ping.loadAoiDeviceTracks(aoisToWkt(aoi.aois), mmsis);
+    const configId = analysis.addedConfigs[0]?.id;
+    if (!configId) return;
+    const base = {
+      analysisConfigId: configId,
+      analysisConfig: analysis.getSettings(configId),
+      aoiWkt: aoisToWkt(aoi.aois),
+      fromIso: ping.rangeStartIso ?? null,
+      toIso: ping.rangeEndIso ?? null,
+      eventCount: 0,
+    };
+    if (job.editingId) {
+      // Re-run the edited job in place (keeps the other applied jobs).
+      job.updateApplied(job.editingId, base);
     } else {
-      ping.clearAoiDeviceTracks();
+      // Fresh job: add a draft alongside the applied jobs.
+      const id = `draft-${Date.now()}`;
+      job.apply({ id, name: 'New job', createdAt: '', ...base });
+      job.setEditing(id);
     }
-
-    layers.showAll();
+    await applyJobs(job.applied);
   };
 
   return (
     <div className="run-job">
       <button type="button" className="run-job__button" disabled={disabled} onClick={handleRun}>
-        {analysis.running ? 'Running…' : 'Run Job'}
+        {analysis.running ? 'Running…' : job.editingId ? 'Re-run' : 'Run Job'}
       </button>
 
       {hasResults && (
         <button type="button" className="run-job__save" onClick={() => setSaveOpen(true)}>
-          {analysis.fromSavedJob ? 'Save As' : 'Save Job'}
+          {editingSaved ? 'Save As' : 'Save Job'}
         </button>
       )}
 

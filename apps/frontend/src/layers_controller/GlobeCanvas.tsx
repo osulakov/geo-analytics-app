@@ -56,6 +56,10 @@ const AOI_ADDED_FILL = 'rgba(250, 204, 21, 0.22)';
 // Click within this many pixels of the first vertex to close the polygon.
 const AOI_CLOSE_RADIUS_PX = 12;
 
+// Mock Data Writer: the device-track line being drawn.
+const MOCK_STROKE = '#38bdf8';
+const MOCK_HINT = 'rgba(56, 189, 248, 0.5)';
+
 // Pre-compute the geometry once at module load — it never changes.
 const topology = countries110m as unknown as Topology;
 const countriesObject = topology.objects.countries as GeometryCollection;
@@ -402,6 +406,7 @@ export function GlobeCanvas({
     const eventStore = stores.event;
     const satelliteStore = stores.satellite;
     const aoiStore = stores.aoi;
+    const mockStore = stores.mock;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
@@ -573,6 +578,39 @@ export function GlobeCanvas({
             ctx.stroke();
           }
         });
+      }
+
+      // Mock Data Writer: the device-track polyline being drawn (or finished).
+      if (mockStore.points.length > 0) {
+        const pts = mockStore.points;
+        if (pts.length >= 2) {
+          ctx.beginPath();
+          path({ type: 'LineString', coordinates: pts });
+          ctx.strokeStyle = MOCK_STROKE;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        }
+        if (mockStore.drawing && mouse.inside && projection.invert) {
+          const cursorGeo = projection.invert([mouse.x, mouse.y]);
+          if (cursorGeo) {
+            ctx.beginPath();
+            path({ type: 'LineString', coordinates: [pts[pts.length - 1], cursorGeo] });
+            ctx.strokeStyle = MOCK_HINT;
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+        for (const p of pts) {
+          if (geoDistance(p, aoiCenter) > Math.PI / 2) continue;
+          const proj = projection(p);
+          if (!proj) continue;
+          ctx.beginPath();
+          ctx.arc(proj[0], proj[1], 3, 0, 2 * Math.PI);
+          ctx.fillStyle = MOCK_STROKE;
+          ctx.fill();
+        }
       }
 
       // Point markers, drawn on top with a fixed pixel size. The centre of the
@@ -1118,7 +1156,7 @@ export function GlobeCanvas({
       mouse.inside = true;
 
       if (!dragging) {
-        canvas.style.cursor = aoiStore.drawing ? 'crosshair' : 'grab';
+        canvas.style.cursor = aoiStore.drawing || mockStore.drawing ? 'crosshair' : 'grab';
         return;
       }
       if (Math.abs(event.clientX - downX) > 4 || Math.abs(event.clientY - downY) > 4) {
@@ -1143,7 +1181,17 @@ export function GlobeCanvas({
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
       }
-      canvas.style.cursor = aoiStore.drawing ? 'crosshair' : 'grab';
+      canvas.style.cursor = aoiStore.drawing || mockStore.drawing ? 'crosshair' : 'grab';
+
+      // Mock Data Writer: a click adds a line point (double-click finishes).
+      if (mockStore.drawing) {
+        if (!didDrag) {
+          const geo = screenToLonLat(event.offsetX, event.offsetY);
+          if (geo) mockStore.addPoint(geo[0], geo[1]);
+        }
+        pressedMmsi = null;
+        return;
+      }
 
       // Draw mode: a click adds a vertex, or closes the polygon when it lands
       // on the first vertex. Dragging rotates the globe and adds nothing.
@@ -1236,8 +1284,13 @@ export function GlobeCanvas({
       zoomAtPointer(event.offsetX, event.offsetY, Math.exp(-event.deltaY * factor));
     };
 
-    // Double-click reports the geographic coordinate under the cursor.
+    // Double-click finishes a mock device-track line, else reports the
+    // geographic coordinate under the cursor.
     const onDblClick = (event: MouseEvent) => {
+      if (mockStore.drawing) {
+        mockStore.finish();
+        return;
+      }
       if (!onPickCoordinateRef.current) return;
       const geo = screenToLonLat(event.offsetX, event.offsetY);
       if (!geo || !Number.isFinite(geo[0]) || !Number.isFinite(geo[1])) {
@@ -1249,7 +1302,9 @@ export function GlobeCanvas({
 
     // Esc cancels an in-progress AOI draft.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && aoiStore.drawing) aoiStore.cancelDrawing();
+      if (event.key !== 'Escape') return;
+      if (aoiStore.drawing) aoiStore.cancelDrawing();
+      if (mockStore.drawing) mockStore.cancel();
     };
 
     canvas.style.cursor = 'grab';
@@ -1293,7 +1348,13 @@ export function GlobeCanvas({
       // Earth rotation and satellite orbits share one real-time clock (real
       // time at 1×); the playback speed multiplier scales both equally, so
       // their relative rates stay physically correct.
-      if (globe.spinning && !dragging && hoveredMmsi === null && !aoiStore.drawing) {
+      if (
+        globe.spinning &&
+        !dragging &&
+        hoveredMmsi === null &&
+        !aoiStore.drawing &&
+        !mockStore.drawing
+      ) {
         const scaled = dt * (globe.speed || 1);
         globe.advanceSpin(scaled);
         satClockMs += scaled;

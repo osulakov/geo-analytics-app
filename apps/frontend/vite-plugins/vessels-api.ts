@@ -167,6 +167,49 @@ export function vesselsApiPlugin(): Plugin {
               return;
             }
 
+            // Mock a vessel + its device-track pings (Mock Data Writer).
+            if (pathname === '/mock/device-track') {
+              const body = await readJsonBody(req);
+              const v = (body.vessel ?? {}) as Record<string, unknown>;
+              const pings = Array.isArray(body.pings) ? (body.pings as unknown[]) : [];
+              const mmsi = String(v.mmsi ?? '');
+              if (!mmsi || pings.length === 0) {
+                json(400, { error: 'mmsi and pings are required' });
+                return;
+              }
+              const pool = getPool();
+              await pool.query(
+                `INSERT INTO static_vessel_info
+                   (mmsi, imo, vessel_name, callsign, flag_state, vessel_type, length_m, width_m, draft_m)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 ON CONFLICT (mmsi) DO NOTHING`,
+                [
+                  mmsi,
+                  v.imo ?? null,
+                  String(v.vesselName ?? 'Mock Vessel'),
+                  v.callsign ?? null,
+                  v.flagState ?? null,
+                  v.vesselType ?? null,
+                  v.length ?? null,
+                  v.width ?? null,
+                  v.draft ?? null,
+                ],
+              );
+              await pool.query(
+                `INSERT INTO ais_pings (mmsi, ts, position, heading, speed)
+                 SELECT $1, t.ts,
+                        ST_SetSRID(ST_MakePoint(t.lon, t.lat), 4326)::geography,
+                        t.heading, t.speed
+                   FROM jsonb_to_recordset($2::jsonb)
+                        AS t(ts timestamptz, lon double precision, lat double precision,
+                              heading double precision, speed double precision)
+                 ON CONFLICT (mmsi, ts) DO NOTHING`,
+                [mmsi, JSON.stringify(pings)],
+              );
+              json(201, { ok: true, mmsi, pings: pings.length });
+              return;
+            }
+
             if (pathname === '/groups') {
               await ensureGroups();
               const body = await readJsonBody(req);

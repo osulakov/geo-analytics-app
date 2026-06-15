@@ -18,7 +18,7 @@ export class SatelliteStore {
   /** The currently selected satellite (pulses + glows on the map). */
   selectedName: string | null = null;
   /** Master visibility for the whole satellite layer (pings, orbits, coverage). */
-  visible = true;
+  visible = false;
 
   constructor() {
     makeAutoObservable(this);

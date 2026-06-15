@@ -7,6 +7,7 @@ import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
 import { JobStore } from './JobStore';
 import { LayerStore } from '../layers_visibilities/LayerStore';
+import { MockStore } from './MockStore';
 import { PingStore } from './PingStore';
 import { SatelliteStore } from './SatelliteStore';
 import { VesselStore } from './VesselStore';
@@ -25,9 +26,11 @@ export class RootStore {
   aoi: AoiStore;
   analysis: AnalysisStore;
   job: JobStore;
+  mock: MockStore;
 
   constructor() {
     this.auth = new AuthStore();
+    this.mock = new MockStore();
     this.aoi = new AoiStore(this.auth);
     this.analysis = new AnalysisStore();
     this.job = new JobStore(this.auth);

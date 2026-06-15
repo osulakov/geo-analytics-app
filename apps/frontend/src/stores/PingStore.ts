@@ -280,6 +280,14 @@ export class PingStore {
     this.setFilter([], []);
   }
 
+  /** Force-reload the ping layers for the current view (e.g. after mocking a
+   *  new vessel) so its recent ping shows up. */
+  reloadPings(): void {
+    void this.loadDetail();
+    void this.loadBase();
+    void this.loadActiveCount();
+  }
+
   /** Set the viewport (pan/zoom). Always reloads the detail layer; reloads the
    *  base layer only when the centre moved enough (i.e. pan, not zoom). */
   setViewport(cap: ViewportCap): void {

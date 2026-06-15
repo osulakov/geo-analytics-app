@@ -555,13 +555,13 @@ body {
 
 .date-range {
   position: relative;
-}
-
-.date-range__main {
   display: flex;
   flex-direction: column;
   gap: var(--text-gap);
-  min-width: 0;
+  padding: var(--element-padding-y) var(--widget-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
 }
 
 .aois-widget {
@@ -1179,37 +1179,65 @@ body {
   opacity: 0.5;
 }
 
-.date-range__trigger {
+.date-range__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: var(--element-padding-y) var(--widget-padding);
-  background: var(--surface-panel);
+  gap: var(--text-gap);
+}
+
+/* In-place editable dates — no separate input box. */
+.date-range__date {
+  width: 10ch;
+  padding: 1px 2px;
   border: none;
-  border-radius: var(--widget-radius);
-  backdrop-filter: var(--blur-panel);
+  border-radius: var(--radius-xs);
+  background: none;
   color: var(--color-fg);
   font-family: inherit;
   font-size: 13px;
-  cursor: pointer;
-}
-
-.date-range__value {
   font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: background var(--transition);
 }
 
-.date-range__chevron {
+.date-range__date::placeholder {
+  color: var(--color-fg);
+  opacity: 0.3;
+}
+
+.date-range__date:hover,
+.date-range__date:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.date-range__sep {
   flex: 0 0 auto;
-  opacity: 0.7;
-  transition: transform 0.2s ease;
+  opacity: 0.5;
 }
 
-.date-range__chevron.is-open {
-  transform: rotate(180deg);
+.date-range__cal-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity var(--transition), color var(--transition);
 }
 
-.date-range__dropdown {
+.date-range__cal-btn:hover,
+.date-range__cal-btn.is-open {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+/* Calendar dropdown */
+.date-range__calendar {
   position: absolute;
   top: calc(100% + var(--element-gap));
   left: 0;
@@ -1217,53 +1245,100 @@ body {
   z-index: 25;
   display: flex;
   flex-direction: column;
-  gap: var(--widget-gap);
+  gap: var(--element-gap);
   padding: var(--widget-padding);
-  background: rgba(20, 24, 31, 0.45);
+  background: var(--surface-panel);
   border-radius: var(--widget-radius);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
 }
 
-.date-range__field {
+.date-range__cal-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--text-gap);
-  font-size: 11px;
-  color: var(--color-fg);
-}
-
-.date-range__field > span {
-  opacity: 0.6;
-}
-
-.date-range__field input {
-  padding: var(--element-padding-y) var(--element-padding-x);
-  border: none;
-  border-radius: var(--element-radius);
-  background: var(--surface-input);
-  color: var(--color-fg);
-  font-family: inherit;
+  align-items: center;
+  justify-content: space-between;
   font-size: 12px;
-  outline: none;
-  color-scheme: dark;
+  font-weight: 600;
 }
 
-.date-range__apply {
-  margin-top: 2px;
-  padding: var(--element-padding-y) var(--element-padding-x);
+.date-range__cal-head button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--element-radius);
-  background: var(--accent);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.date-range__cal-head button:hover {
+  background: var(--surface-control-hover);
+}
+
+.date-range__cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-range__cal-weekday {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  padding-bottom: 2px;
+}
+
+.date-range__cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
   color: var(--color-fg);
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   transition: background var(--transition);
 }
 
-.date-range__apply:hover {
-  background: var(--accent-hover);
+.date-range__cal-cell.is-empty {
+  cursor: default;
+}
+
+.date-range__cal-cell:not(.is-empty):hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.date-range__cal-cell.is-range {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  border-radius: 0;
+}
+
+.date-range__cal-cell.is-start,
+.date-range__cal-cell.is-end {
+  background: var(--color-primary);
+  color: #06231d;
+  font-weight: 600;
+}
+
+.date-range__cal-cell.is-start {
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+}
+
+.date-range__cal-cell.is-end {
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+}
+
+.date-range__cal-cell.is-start.is-end {
+  border-radius: var(--radius-xs);
 }
 
 .vessels-widget {
@@ -1693,6 +1768,130 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.6;
+}
+
+/* Mock Data Writer section (Data widget) — collapsible. */
+.mock-writer-section {
+  margin-top: 15px;
+}
+
+.mock-writer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 var(--widget-padding) var(--text-gap);
+  background: none;
+  border: none;
+  color: var(--color-title);
+  font-family: inherit;
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.mock-writer__chevron {
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+.mock-writer__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.mock-writer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: 0 var(--widget-padding) var(--element-gap);
+}
+
+.mock-writer__select {
+  width: 100%;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.mock-writer__start {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.mock-writer__start:hover {
+  background: var(--surface-control-hover);
+}
+
+.mock-writer__hint {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.6;
+}
+
+/* Yellow highlighted "drawing in progress" banner. */
+.mock-writer__drawing {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: rgba(250, 204, 21, 0.16);
+  color: var(--fixed-yellow);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Created-vessel card with add-to-group. */
+.mock-writer__created {
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mock-writer__created-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mock-writer__created-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.mock-writer__create {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--color-primary);
+  color: #06231d;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.mock-writer__create:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.mock-writer__create:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
 }
 
 .satellite-row {
@@ -3032,8 +3231,7 @@ body {
 }
 
 /* Subtle glow + border on every widget / dialog / tooltip wrapper. */
-.date-range__trigger,
-.date-range__dropdown,
+.date-range,
 .vessels-widget,
 .layers-widget,
 .aois-widget,

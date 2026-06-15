@@ -57,6 +57,12 @@ export class LayerStore {
     this.pingsVisible = next;
   }
 
+  /** Turn the global device-tracks layer on (e.g. to reveal a mocked vessel). */
+  showDeviceTracks(): void {
+    this.deviceTracksVisible = true;
+    this.pingsVisible = true;
+  }
+
   togglePings(): void {
     this.pingsVisible = !this.pingsVisible;
     // Parent reflects its sublayers: on if any sublayer is on, off if none are.

@@ -16,6 +16,11 @@ export class VesselStore {
 
   async load(): Promise<void> {
     if (this.loaded) return;
+    await this.reload();
+  }
+
+  /** Force a re-fetch (e.g. after mocking a new vessel). */
+  async reload(): Promise<void> {
     try {
       const vessels = await fetchStaticVesselInfo();
       runInAction(() => {

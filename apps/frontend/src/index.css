@@ -314,6 +314,25 @@ body {
   background: var(--surface-control-hover);
 }
 
+.run-job__discard {
+  padding: 6px 16.8px;
+  border: none;
+  border-radius: var(--element-radius);
+  background: color-mix(in srgb, var(--fixed-red) 22%, transparent);
+  color: var(--fixed-red);
+  font-family: inherit;
+  font-size: 8.4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.run-job__discard:hover {
+  background: color-mix(in srgb, var(--fixed-red) 36%, transparent);
+}
+
 /* Save Job modal */
 .save-job-modal {
   display: flex;

@@ -177,6 +177,37 @@ export class PingStore {
     this.aoiPings = [];
   }
 
+  /** Load + merge AOI device tracks for several jobs (combined applied jobs).
+   *  Each job is scoped to its own AOI WKT and (optional) vessel MMSIs; the
+   *  union is deduped per vessel. */
+  async loadAoiDeviceTracksForJobs(
+    jobs: { wkt: string | null; mmsis: string[] }[],
+  ): Promise<void> {
+    const withWkt = jobs.filter((j): j is { wkt: string; mmsis: string[] } => Boolean(j.wkt));
+    if (withWkt.length === 0) {
+      runInAction(() => {
+        this.aoiPings = [];
+      });
+      return;
+    }
+    try {
+      const lists = await Promise.all(
+        withWkt.map(async (j) => {
+          const pings = await fetchAoiDeviceTracks(j.wkt, this.rangeStartIso, this.rangeEndIso);
+          const allow = j.mmsis.length > 0 ? new Set(j.mmsis) : null;
+          return allow ? pings.filter((p) => allow.has(p.mmsi)) : pings;
+        }),
+      );
+      const byMmsi = new Map<string, LatestPing>();
+      for (const list of lists) for (const p of list) byMmsi.set(p.mmsi, p);
+      runInAction(() => {
+        this.aoiPings = Array.from(byMmsi.values());
+      });
+    } catch (error) {
+      console.error('Failed to load AOI device tracks for jobs:', error);
+    }
+  }
+
   get rangeStartIso(): string {
     return dayStartIso(this.fromDate);
   }

@@ -48,43 +48,79 @@ export const RecentJobsWidget = observer(function RecentJobsWidget({
   // When collapsed with applied jobs, the Applied list replaces the search box.
   const showSearch = expanded || !hasApplied;
 
+  /** Apply (combine) the given jobs: union date range, combined events, and
+   *  merged AOI device tracks. Clears everything when there are none. */
+  const applyJobs = async (jobs: Job[]) => {
+    if (jobs.length === 0) {
+      // Removing the last applied job empties the New-job widgets + map too.
+      event.clearJob();
+      ping.clearAoiDeviceTracks();
+      ping.clearJobTracks();
+      analysis.reset();
+      aoi.setFromWkt(null);
+      layers.clearLayers();
+      return;
+    }
+
+    // Global date range = union of all applied jobs' ranges.
+    const froms = jobs.map((j) => j.fromIso).filter((x): x is string => Boolean(x));
+    const tos = jobs.map((j) => j.toIso).filter((x): x is string => Boolean(x));
+    if (froms.length > 0 && tos.length > 0) {
+      const minFrom = froms.reduce((a, b) => (a < b ? a : b));
+      const maxTo = tos.reduce((a, b) => (a > b ? a : b));
+      ping.applyRange(minFrom.slice(0, 10), maxTo.slice(0, 10));
+    }
+
+    // Run each job's analysis and combine the produced events.
+    const events = await analysis.runJobs(
+      jobs.map((j) => ({
+        analysisConfigId: j.analysisConfigId,
+        wkt: j.aoiWkt,
+        fromIso: j.fromIso,
+        toIso: j.toIso,
+        settings: j.analysisConfig ?? undefined,
+      })),
+    );
+    event.setJobEvents(events);
+    ping.clearJobTracks();
+
+    // Merge AOI device tracks across the jobs whose analyses declare them.
+    const aoiJobs = jobs
+      .filter((j) => {
+        const config = ANALYSES.find((a) => a.id === j.analysisConfigId);
+        return config?.layers_config.some((layer) => layer.config?.aoi_bounded);
+      })
+      .map((j) => ({ wkt: j.aoiWkt, mmsis: j.analysisConfig?.mmsis ?? [] }));
+    if (aoiJobs.length > 0) {
+      await ping.loadAoiDeviceTracksForJobs(aoiJobs);
+    } else {
+      ping.clearAoiDeviceTracks();
+    }
+
+    layers.showAll();
+  };
+
   const handleOpen = async (saved: Job) => {
     setOpeningId(saved.id);
     try {
-      // Restore the job's parameters into the New-job widgets + map.
-      if (saved.fromIso && saved.toIso) {
-        ping.applyRange(saved.fromIso.slice(0, 10), saved.toIso.slice(0, 10));
-      }
+      job.apply(saved);
+      // Restore the clicked job's params into the New-job widgets (for Save As).
       aoi.setFromWkt(saved.aoiWkt);
       analysis.setAdded([saved.analysisConfigId]);
       analysis.setOpenedJobName(saved.name);
+      if (saved.analysisConfig) analysis.setSettings(saved.analysisConfigId, saved.analysisConfig);
 
-      // Re-run the analysis (with its saved settings) and show its results.
-      const events = await analysis.runConfig(
-        saved.analysisConfigId,
-        saved.aoiWkt,
-        saved.fromIso,
-        saved.toIso,
-        saved.analysisConfig ?? undefined,
-      );
-      event.setJobEvents(events);
-      // Drop any full paths from a previously-opened job.
-      ping.clearJobTracks();
-
-      // AOI-bounded device tracks, if the job's analysis declares them — scoped
-      // to the job's selected vessels (if any).
-      const config = ANALYSES.find((a) => a.id === saved.analysisConfigId);
-      if (config?.layers_config.some((layer) => layer.config?.aoi_bounded)) {
-        await ping.loadAoiDeviceTracks(saved.aoiWkt, saved.analysisConfig?.mmsis ?? []);
-      } else {
-        ping.clearAoiDeviceTracks();
-      }
-      layers.showAll();
-      job.apply(saved);
+      // Combine all applied jobs on the map.
+      await applyJobs(job.applied);
       onOpened?.();
     } finally {
       setOpeningId(null);
     }
+  };
+
+  const handleUnapply = async (id: string) => {
+    job.unapply(id);
+    await applyJobs(job.applied);
   };
 
   return (
@@ -133,7 +169,7 @@ export const RecentJobsWidget = observer(function RecentJobsWidget({
                   className="aoi-row__trash"
                   title="Remove from applied"
                   aria-label="Remove from applied"
-                  onClick={() => job.unapply(j.id)}
+                  onClick={() => handleUnapply(j.id)}
                 >
                   <DeleteOutlineIcon fontSize="inherit" />
                 </button>

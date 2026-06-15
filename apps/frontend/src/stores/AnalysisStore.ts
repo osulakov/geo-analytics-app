@@ -65,6 +65,15 @@ export class AnalysisStore {
     this.added = this.added.filter((x) => x !== id);
   }
 
+  /** Clear all selected analyses, results and per-analysis settings (Discard). */
+  reset(): void {
+    this.added = [];
+    this.lastResults = [];
+    this.fromSavedJob = false;
+    this.openedJobName = null;
+    this.settingsById = {};
+  }
+
   /** Replace the Added list with the given analysis ids (known ones only). */
   setAdded(ids: string[]): void {
     this.added = ids.filter((id) => ANALYSES.some((a) => a.id === id));
@@ -122,6 +131,47 @@ export class AnalysisStore {
       return results;
     } catch (error) {
       console.error('Run Job failed:', error);
+      return [];
+    } finally {
+      runInAction(() => {
+        this.running = false;
+      });
+    }
+  }
+
+  /**
+   * Run several saved jobs and combine their results. Each job runs its own
+   * analysis query (with its saved AOI/date range/settings); the combined
+   * events are stored as `lastResults` and returned.
+   */
+  async runJobs(
+    jobs: {
+      analysisConfigId: string;
+      wkt: string | null;
+      fromIso: string | null;
+      toIso: string | null;
+      settings?: AnalysisSettings;
+    }[],
+  ): Promise<MapEvent[]> {
+    if (this.running) return this.resultEvents;
+    this.fromSavedJob = true;
+    this.running = true;
+    try {
+      const results: JobResult[] = [];
+      for (const j of jobs) {
+        const config = ANALYSES.find((a) => a.id === j.analysisConfigId);
+        if (!config) continue;
+        const settings = j.settings ?? this.getSettings(j.analysisConfigId);
+        const { sql, params } = config.buildQuery(j.wkt, j.fromIso, j.toIso, settings);
+        const rows = await runQuery(sql, params);
+        results.push({ analysisId: config.id, analysisName: config.name, rows });
+      }
+      runInAction(() => {
+        this.lastResults = results;
+      });
+      return this.resultEvents;
+    } catch (error) {
+      console.error('Apply jobs failed:', error);
       return [];
     } finally {
       runInAction(() => {

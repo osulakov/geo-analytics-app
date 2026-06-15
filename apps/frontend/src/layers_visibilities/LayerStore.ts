@@ -74,4 +74,10 @@ export class LayerStore {
       for (const layer of analysis.layers_config) this.visibleLayers.add(layer.id);
     }
   }
+
+  /** Hide all configured event layers (Discard). Leaves the Data-widget global
+   *  device-tracks group untouched. */
+  clearLayers(): void {
+    this.visibleLayers.clear();
+  }
 }

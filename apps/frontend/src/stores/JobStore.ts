@@ -51,6 +51,11 @@ export class JobStore {
     this.applied = this.applied.filter((j) => j.id !== id);
   }
 
+  /** Drop all applied jobs (Discard). */
+  clearApplied(): void {
+    this.applied = [];
+  }
+
   /** Fetch the signed-in user's saved jobs into `jobs`. */
   async loadJobs(): Promise<void> {
     if (!this.auth.token) {

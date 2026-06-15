@@ -11,11 +11,27 @@ import { SaveJobModal } from './SaveJobModal';
  * run, all layers are turned on and a Save Job action appears.
  */
 export const RunJobWidget = observer(function RunJobWidget() {
-  const { analysis, aoi, ping, layers, event } = useStores();
+  const { analysis, aoi, ping, layers, event, job } = useStores();
   const [saveOpen, setSaveOpen] = useState(false);
 
   const disabled = analysis.running || analysis.addedConfigs.length === 0;
   const hasResults = analysis.lastResults.length > 0;
+  const canDiscard =
+    hasResults ||
+    job.applied.length > 0 ||
+    analysis.added.length > 0 ||
+    aoi.aois.length > 0;
+
+  /** Wipe all applied/opened jobs, results and the job-creation widgets. */
+  const handleDiscard = () => {
+    job.clearApplied();
+    analysis.reset();
+    aoi.setFromWkt(null);
+    event.clearJob();
+    ping.clearAoiDeviceTracks();
+    ping.clearJobTracks();
+    layers.clearLayers();
+  };
 
   const handleRun = async () => {
     await analysis.run(aoi.aois, ping.rangeStartIso ?? null, ping.rangeEndIso ?? null);
@@ -50,6 +66,12 @@ export const RunJobWidget = observer(function RunJobWidget() {
       {hasResults && (
         <button type="button" className="run-job__save" onClick={() => setSaveOpen(true)}>
           {analysis.fromSavedJob ? 'Save As' : 'Save Job'}
+        </button>
+      )}
+
+      {canDiscard && (
+        <button type="button" className="run-job__discard" onClick={handleDiscard}>
+          Discard
         </button>
       )}
 

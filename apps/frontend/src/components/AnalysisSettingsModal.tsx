@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { observer } from 'mobx-react-lite';
 
@@ -33,6 +33,18 @@ export const AnalysisSettingsModal = observer(function AnalysisSettingsModal({
 }) {
   const { analysis, vessel, group } = useStores();
   const [vesselQuery, setVesselQuery] = useState('');
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  // Close the group dropdown on any click outside it.
+  useEffect(() => {
+    if (!groupMenuOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!groupRef.current?.contains(e.target as Node)) setGroupMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [groupMenuOpen]);
 
   const settings = analysis.getSettings(config.id);
   const set = (patch: Partial<AnalysisSettings>) => analysis.setSettings(config.id, patch);
@@ -124,22 +136,54 @@ export const AnalysisSettingsModal = observer(function AnalysisSettingsModal({
             )}
           </div>
 
-          <select
-            className="analysis-settings__group-select"
-            value=""
-            onChange={(event) => {
-              const g = group.groups.find((x) => String(x.id) === event.target.value);
-              if (g) addMmsis(g.mmsis);
-            }}
-            aria-label="Add a vessel group"
-          >
-            <option value="">Add from vessel group…</option>
-            {group.groups.map((g) => (
-              <option key={g.id} value={String(g.id)}>
-                {g.name} ({g.mmsis.length})
-              </option>
-            ))}
-          </select>
+          <div className="analysis-settings__group" ref={groupRef}>
+            <button
+              type="button"
+              className="analysis-settings__group-trigger"
+              aria-haspopup="listbox"
+              aria-expanded={groupMenuOpen}
+              onClick={() => setGroupMenuOpen((o) => !o)}
+            >
+              <span>Add from vessel group…</span>
+              <svg
+                className={`analysis-settings__group-chevron${groupMenuOpen ? ' is-open' : ''}`}
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {groupMenuOpen && (
+              <div className="analysis-settings__dropdown" role="listbox">
+                {group.groups.length === 0 ? (
+                  <div className="analysis-settings__hint">No vessel groups yet</div>
+                ) : (
+                  group.groups.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      role="option"
+                      className="analysis-settings__option"
+                      onClick={() => {
+                        addMmsis(g.mmsis);
+                        setGroupMenuOpen(false);
+                      }}
+                    >
+                      <span className="analysis-settings__option-name">{g.name}</span>
+                      <span className="analysis-settings__option-meta">{g.mmsis.length} vessels</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
           {selected.length > 0 ? (
             <div className="analysis-settings__chips">

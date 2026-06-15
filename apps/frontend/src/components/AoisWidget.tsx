@@ -12,6 +12,7 @@ import BookmarkAddedIcon from '@mui/icons-material/BookmarkAddedOutlined';
 import AddIcon from '@mui/icons-material/Add';
 
 import { useStores } from '../stores/StoreContext';
+import { aoisToWkt } from '../analyses_configs/wkt';
 import type { Aoi } from '../stores/AoiStore';
 
 interface AoiOption {
@@ -40,9 +41,19 @@ export const AoisWidget = observer(function AoisWidget() {
   const { aoi } = useStores();
   const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<Aoi | null>(null);
+  const [wktItem, setWktItem] = useState<Aoi | null>(null);
+  const [copied, setCopied] = useState(false);
   const [addedPage, setAddedPage] = useState(0);
   const [libPage, setLibPage] = useState(0);
   const [libQuery, setLibQuery] = useState('');
+
+  const wktText = wktItem ? (aoisToWkt([wktItem]) ?? '') : '';
+  const copyWkt = () => {
+    void navigator.clipboard?.writeText(wktText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
 
   const confirmDelete = () => {
     if (pendingDelete) aoi.removeAoi(pendingDelete.id);
@@ -107,6 +118,20 @@ export const AoisWidget = observer(function AoisWidget() {
           onClick={() => aoi.selectAoi(item.id)}
         >
           <AddIcon fontSize="inherit" />
+        </button>
+      )}
+      {!showSave && (
+        <button
+          type="button"
+          className="aoi-row__wkt"
+          title="View WKT"
+          aria-label="View WKT"
+          onClick={() => {
+            setCopied(false);
+            setWktItem(item);
+          }}
+        >
+          WKT
         </button>
       )}
       <button
@@ -272,6 +297,38 @@ export const AoisWidget = observer(function AoisWidget() {
                 </button>
                 <button type="button" className="confirm-dialog__delete" onClick={confirmDelete}>
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {wktItem &&
+        createPortal(
+          <div className="confirm-dialog__overlay" onClick={() => setWktItem(null)}>
+            <div className="wkt-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="wkt-modal__header">
+                <span className="wkt-modal__title">{wktItem.name} — WKT</span>
+                <button
+                  type="button"
+                  className="wkt-modal__close"
+                  aria-label="Close"
+                  onClick={() => setWktItem(null)}
+                >
+                  ×
+                </button>
+              </div>
+              <textarea
+                className="wkt-modal__text"
+                readOnly
+                rows={6}
+                value={wktText}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+              <div className="wkt-modal__actions">
+                <button type="button" className="wkt-modal__copy" onClick={copyWkt}>
+                  {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
             </div>

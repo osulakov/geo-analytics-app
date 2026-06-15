@@ -5,16 +5,17 @@ import { VesselsWidget } from './VesselsWidget';
 import { useStores } from '../stores/StoreContext';
 
 /**
- * Second left-column shown once a job has been run: the Layers widget for the
- * result events, and below it the Vessels widget (scoped to the device-tracks
- * layer's vessels).
+ * Second left-column: the Layers widget for a job's result events (only after a
+ * run), and the Vessels widget — shown whenever there are job results OR the
+ * global device-tracks layer (Data widget) is on.
  */
 export const JobResultsColumn = observer(function JobResultsColumn() {
-  const { analysis } = useStores();
-  if (analysis.lastResults.length === 0) return null;
+  const { analysis, layers } = useStores();
+  const hasResults = analysis.lastResults.length > 0;
+  if (!hasResults && !layers.deviceTracksVisible) return null;
   return (
     <div className="left-stack">
-      <LayersWidget />
+      {hasResults && <LayersWidget />}
       <VesselsWidget />
     </div>
   );

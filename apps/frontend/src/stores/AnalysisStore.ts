@@ -1,10 +1,17 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
-import { ANALYSES, type AnalysisConfig } from '../analyses_configs';
+import { ANALYSES, type AnalysisConfig, type AnalysisSettings } from '../analyses_configs';
 import { aoisToWkt } from '../analyses_configs/wkt';
 import { runQuery } from '../data_loaders/query';
 import type { MapEvent } from '../data_loaders/events';
 import type { Aoi } from './AoiStore';
+
+function defaultSettingsFor(id: string): AnalysisSettings {
+  const config = ANALYSES.find((a) => a.id === id);
+  return config
+    ? { ...config.defaultSettings, mmsis: [...config.defaultSettings.mmsis] }
+    : { detectEezCrossing: true, detectAoiCrossing: false, mmsis: [] };
+}
 
 export interface JobResult {
   analysisId: string;
@@ -21,9 +28,29 @@ export class AnalysisStore {
   added: string[] = [];
   running = false;
   lastResults: JobResult[] = [];
+  /** True when the current results came from opening a saved job (Save → "Save
+   *  As"); false after a fresh Run Job. */
+  fromSavedJob = false;
+  /** Name of the opened saved job (prefilled into the Save As modal). */
+  openedJobName: string | null = null;
+  /** Per-analysis settings, keyed by analysis id (defaults applied lazily). */
+  settingsById: Record<string, AnalysisSettings> = {};
 
   constructor() {
     makeAutoObservable(this);
+  }
+
+  /** Current settings for an analysis (its defaults until edited). */
+  getSettings(id: string): AnalysisSettings {
+    return this.settingsById[id] ?? defaultSettingsFor(id);
+  }
+
+  /** Merge a settings patch for an analysis. */
+  setSettings(id: string, patch: Partial<AnalysisSettings>): void {
+    this.settingsById = {
+      ...this.settingsById,
+      [id]: { ...this.getSettings(id), ...patch },
+    };
   }
 
   isAdded(id: string): boolean {
@@ -41,6 +68,11 @@ export class AnalysisStore {
   /** Replace the Added list with the given analysis ids (known ones only). */
   setAdded(ids: string[]): void {
     this.added = ids.filter((id) => ANALYSES.some((a) => a.id === id));
+  }
+
+  /** Remember the opened saved job's name (for the Save As modal). */
+  setOpenedJobName(name: string | null): void {
+    this.openedJobName = name;
   }
 
   get addedConfigs(): AnalysisConfig[] {
@@ -70,12 +102,14 @@ export class AnalysisStore {
   async run(aois: Aoi[], fromIso: string | null, toIso: string | null): Promise<JobResult[]> {
     const configs = this.addedConfigs;
     if (configs.length === 0 || this.running) return [];
+    this.fromSavedJob = false;
+    this.openedJobName = null;
     const wkt = aoisToWkt(aois);
     this.running = true;
     try {
       const results: JobResult[] = [];
       for (const config of configs) {
-        const { sql, params } = config.buildQuery(wkt, fromIso, toIso);
+        const { sql, params } = config.buildQuery(wkt, fromIso, toIso, this.getSettings(config.id));
         const rows = await runQuery(sql, params);
         results.push({ analysisId: config.id, analysisName: config.name, rows });
         console.log(
@@ -106,12 +140,16 @@ export class AnalysisStore {
     wkt: string | null,
     fromIso: string | null,
     toIso: string | null,
+    settings?: AnalysisSettings,
   ): Promise<MapEvent[]> {
     const config = ANALYSES.find((a) => a.id === analysisConfigId);
     if (!config || this.running) return [];
+    this.fromSavedJob = true;
+    // Restore the job's saved settings so the modal + a later run reflect them.
+    if (settings) this.setSettings(analysisConfigId, settings);
     this.running = true;
     try {
-      const { sql, params } = config.buildQuery(wkt, fromIso, toIso);
+      const { sql, params } = config.buildQuery(wkt, fromIso, toIso, this.getSettings(analysisConfigId));
       const rows = await runQuery(sql, params);
       runInAction(() => {
         this.lastResults = [{ analysisId: config.id, analysisName: config.name, rows }];

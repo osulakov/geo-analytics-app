@@ -41,6 +41,7 @@ export async function ensureSchema(): Promise<void> {
       user_id            BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name               TEXT NOT NULL,
       analysis_config_id TEXT NOT NULL,
+      analysis_config    JSONB,
       aoi_wkt            TEXT,
       from_ts            TIMESTAMPTZ,
       to_ts              TIMESTAMPTZ,
@@ -48,6 +49,7 @@ export async function ensureSchema(): Promise<void> {
       created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS jobs_user_id_idx ON jobs (user_id);
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS analysis_config JSONB;
   `);
 
   // Tag events with the job that produced them (events table is created by the

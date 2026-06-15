@@ -4,6 +4,19 @@ export interface AnalysisQuery {
   params: unknown[];
 }
 
+/**
+ * Per-analysis settings (persisted on a job as `analysis_config`). The
+ * analysis' `buildQuery` reads these to shape the query at run time.
+ */
+export interface AnalysisSettings {
+  /** Detect EEZ boundary crossings (geofence_enter_exit events). */
+  detectEezCrossing: boolean;
+  /** Detect crossings of the selected AOI's boundary. */
+  detectAoiCrossing: boolean;
+  /** Restrict to these vessel MMSIs (from the vessel/group pickers). Empty = all. */
+  mmsis: string[];
+}
+
 /** How a layer is drawn on the map / shown in the legend. */
 export type LayerKind = "ICON";
 /** Icon shape for `type: 'ICON'` layers. */
@@ -53,15 +66,19 @@ export interface AnalysisConfig {
   eventType: string;
   /** Map layers this analysis contributes (drives the Layers widget). */
   layers_config: LayerConfig[];
+  /** Default settings (shown in the settings modal, used when none saved). */
+  defaultSettings: AnalysisSettings;
   /**
    * Build the DB query.
    * @param wkt    AOI polygon/multipolygon (WGS84) to scope to, or null for global.
    * @param fromIso Inclusive start of the date range, or null for unbounded.
    * @param toIso   Inclusive end of the date range, or null for unbounded.
+   * @param settings Per-analysis settings (defaults to `defaultSettings`).
    */
   buildQuery(
     wkt: string | null,
     fromIso?: string | null,
     toIso?: string | null,
+    settings?: AnalysisSettings,
   ): AnalysisQuery;
 }

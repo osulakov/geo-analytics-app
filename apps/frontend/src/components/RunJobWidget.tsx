@@ -27,11 +27,13 @@ export const RunJobWidget = observer(function RunJobWidget() {
     // If any run analysis declares an aoi_bounded device-tracks layer, fetch
     // device tracks for the selected AOIs only (separate from the global
     // device-tracks layer controlled by the Data widget).
-    const wantsAoiTracks = analysis.addedConfigs.some((config) =>
+    const aoiConfigs = analysis.addedConfigs.filter((config) =>
       config.layers_config.some((layer) => layer.config?.aoi_bounded),
     );
-    if (wantsAoiTracks) {
-      await ping.loadAoiDeviceTracks(aoisToWkt(aoi.aois));
+    if (aoiConfigs.length > 0) {
+      // Scope the job's device tracks to the analyses' selected vessels (if any).
+      const mmsis = [...new Set(aoiConfigs.flatMap((c) => analysis.getSettings(c.id).mmsis))];
+      await ping.loadAoiDeviceTracks(aoisToWkt(aoi.aois), mmsis);
     } else {
       ping.clearAoiDeviceTracks();
     }
@@ -47,7 +49,7 @@ export const RunJobWidget = observer(function RunJobWidget() {
 
       {hasResults && (
         <button type="button" className="run-job__save" onClick={() => setSaveOpen(true)}>
-          Save Job
+          {analysis.fromSavedJob ? 'Save As' : 'Save Job'}
         </button>
       )}
 

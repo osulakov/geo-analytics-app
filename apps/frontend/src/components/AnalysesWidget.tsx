@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 
 import { ANALYSES, type AnalysisConfig } from '../analyses_configs';
+import { AnalysisSettingsModal } from './AnalysisSettingsModal';
 import { useStores } from '../stores/StoreContext';
 
 /**
@@ -15,6 +17,7 @@ export const AnalysesWidget = observer(function AnalysesWidget() {
   const { analysis } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
+  const [settingsConfig, setSettingsConfig] = useState<AnalysisConfig | null>(null);
 
   const handleSearch = (value: string) => {
     setQuery(value);
@@ -32,36 +35,58 @@ export const AnalysesWidget = observer(function AnalysesWidget() {
     ? ANALYSES.filter((a) => `${a.name} ${a.description}`.toLowerCase().includes(q))
     : ANALYSES;
 
-  const renderRow = (analysis: AnalysisConfig, inAdded: boolean) => (
-    <div key={analysis.id} className="analysis-row">
+  // Shortened row for the Added section: name + remove only (no description).
+  const renderAddedRow = (config: AnalysisConfig) => (
+    <div key={config.id} className="analysis-row">
       <div className="analysis-item">
-        <span className="analysis-item__name">{analysis.name}</span>
-        <span className="analysis-item__desc">{analysis.description}</span>
+        <span className="analysis-item__name">{config.name}</span>
       </div>
-      {inAdded ? (
-        <button
-          type="button"
-          className="aoi-row__trash"
-          title="Remove from Added"
-          aria-label="Remove from Added"
-          onClick={() => removeFromAdded(analysis.id)}
-        >
-          <DeleteOutlineIcon fontSize="inherit" />
-        </button>
-      ) : (
+      <button
+        type="button"
+        className="aoi-row__trash"
+        title="Remove from Added"
+        aria-label="Remove from Added"
+        onClick={() => removeFromAdded(config.id)}
+      >
+        <DeleteOutlineIcon fontSize="inherit" />
+      </button>
+    </div>
+  );
+
+  // Full Library row: name + description + add.
+  const renderLibraryRow = (config: AnalysisConfig) => (
+    <div key={config.id} className="analysis-row">
+      <div className="analysis-item">
+        <span className="analysis-item__name">{config.name}</span>
+        <span className="analysis-item__desc">{config.description}</span>
+      </div>
+      <div className="analysis-row__actions">
         <button
           type="button"
           className="aoi-row__add"
-          title={isAdded(analysis.id) ? 'Already added' : 'Add to Added'}
+          title="Analysis settings"
+          aria-label="Analysis settings"
+          onClick={() => setSettingsConfig(config)}
+        >
+          <SettingsIcon fontSize="inherit" />
+        </button>
+        <button
+          type="button"
+          className="aoi-row__add"
+          title={isAdded(config.id) ? 'Already added' : 'Add to Added'}
           aria-label="Add to Added"
-          disabled={isAdded(analysis.id)}
-          onClick={() => addToAdded(analysis.id)}
+          disabled={isAdded(config.id)}
+          onClick={() => addToAdded(config.id)}
         >
           <AddIcon fontSize="inherit" />
         </button>
-      )}
+      </div>
     </div>
   );
+
+  const hasAdded = addedConfigs.length > 0;
+  // When collapsed with added analyses, the Added list replaces the search box.
+  const showSearch = expanded || !hasAdded;
 
   return (
     <div className={`data-widget${expanded ? '' : ' is-collapsed'}`}>
@@ -88,38 +113,43 @@ export const AnalysesWidget = observer(function AnalysesWidget() {
         </svg>
       </button>
 
-      <div className="data-widget__search">
-        <input
-          type="text"
-          value={query}
-          onChange={(event) => handleSearch(event.target.value)}
-          placeholder="Search analyses"
-          aria-label="Search analyses"
-        />
-      </div>
+      {/* Added section, above the search field. The label is hidden while
+          collapsed (the list alone stands in for the search box). */}
+      {hasAdded && (
+        <div className="aoi-section">
+          {expanded && <div className="aoi-section__label">Added</div>}
+          <div className="data-widget__list">{addedConfigs.map(renderAddedRow)}</div>
+        </div>
+      )}
+
+      {showSearch && (
+        <div className="data-widget__search">
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => handleSearch(event.target.value)}
+            placeholder="Search analyses"
+            aria-label="Search analyses"
+          />
+        </div>
+      )}
 
       {expanded && (
-        <>
-          {addedConfigs.length > 0 && (
-            <div className="aoi-section">
-              <div className="aoi-section__label">Added</div>
-              <div className="data-widget__list">
-                {addedConfigs.map((analysis) => renderRow(analysis, true))}
-              </div>
-            </div>
+        <div className="aoi-section">
+          <div className="aoi-section__label">Library</div>
+          {library.length === 0 ? (
+            <div className="data-widget__empty">No analyses</div>
+          ) : (
+            <div className="data-widget__list">{library.map(renderLibraryRow)}</div>
           )}
+        </div>
+      )}
 
-          <div className="aoi-section">
-            <div className="aoi-section__label">Library</div>
-            {library.length === 0 ? (
-              <div className="data-widget__empty">No analyses</div>
-            ) : (
-              <div className="data-widget__list">
-                {library.map((analysis) => renderRow(analysis, false))}
-              </div>
-            )}
-          </div>
-        </>
+      {settingsConfig && (
+        <AnalysisSettingsModal
+          config={settingsConfig}
+          onClose={() => setSettingsConfig(null)}
+        />
       )}
     </div>
   );

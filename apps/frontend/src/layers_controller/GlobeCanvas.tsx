@@ -568,6 +568,9 @@ export function GlobeCanvas({
       // Active time window (client-side filter for tracks + events).
       const winStart = Date.parse(pingStore.windowStart);
       const winEnd = Date.parse(pingStore.windowEnd);
+      // Active vessel-group filter: when set, device tracks AND events are
+      // limited to these MMSIs (applies to job results too, not just globals).
+      const allowMmsis = pingStore.filterMmsis ? new Set(pingStore.filterMmsis) : null;
       for (const marker of markers) {
         const coordinates = marker.geometry.coordinates as [number, number];
         if (geoDistance(coordinates, center) > Math.PI / 2) continue;
@@ -589,8 +592,8 @@ export function GlobeCanvas({
       let nearestDist2 = HOVER_RADIUS * HOVER_RADIUS;
 
       // Loaded vessel tracks, drawn as individual pings (no lines). Part of the
-      // Device-tracks layer.
-      if (layerStore.deviceTracksVisible) {
+      // Device-tracks layer — shown for the global layer or a job's AOI layer.
+      if (layerStore.deviceTracksVisible || layerStore.isLayerVisible('device-tracks')) {
         for (const tr of pingStore.tracks) {
           ctx.fillStyle = colorForMmsi(tr.mmsi);
           for (const point of tr.points) {
@@ -622,6 +625,7 @@ export function GlobeCanvas({
       // drawn as individual pings under the configured 'device-tracks' layer.
       if (layerStore.isLayerVisible('device-tracks')) {
         for (const tr of pingStore.jobTracks) {
+          if (allowMmsis && !allowMmsis.has(tr.mmsi)) continue;
           ctx.fillStyle = colorForMmsi(tr.mmsi);
           for (const point of tr.points) {
             const pt = Date.parse(point.ts);
@@ -678,6 +682,7 @@ export function GlobeCanvas({
       // layer above; controlled by the configured 'device-tracks' layer toggle).
       if (layerStore.isLayerVisible('device-tracks')) {
         for (const ping of pingStore.aoiPings) {
+          if (allowMmsis && !allowMmsis.has(ping.mmsi)) continue;
           const coordinates: [number, number] = [ping.lon, ping.lat];
           if (geoDistance(coordinates, center) > Math.PI / 2) continue;
           const projected = projection(coordinates);
@@ -748,6 +753,7 @@ export function GlobeCanvas({
       if (layerStore.geofenceVisible && geofenceIconReady) {
         const half = GEOFENCE_ICON_SIZE / 2;
         for (const ev of eventStore.geofence) {
+          if (allowMmsis && !allowMmsis.has(ev.mmsi)) continue;
           const et = Date.parse(ev.ts);
           if (et < winStart || et > winEnd) continue;
           const coordinates: [number, number] = [ev.lon, ev.lat];
@@ -773,6 +779,7 @@ export function GlobeCanvas({
       if (layerStore.aisOffVisible) {
         const s = AIS_OFF_SIZE;
         for (const ev of eventStore.aisOff) {
+          if (allowMmsis && !allowMmsis.has(ev.mmsi)) continue;
           const et = Date.parse(ev.ts);
           if (et < winStart || et > winEnd) continue;
           const coordinates: [number, number] = [ev.lon, ev.lat];

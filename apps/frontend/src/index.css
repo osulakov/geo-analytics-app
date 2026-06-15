@@ -655,6 +655,200 @@ body {
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* Settings (gear) stacked above the add (+) button on a Library row. */
+.analysis-row__actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--text-gap);
+}
+
+/* Analysis settings modal */
+.analysis-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--widget-gap);
+  width: min(420px, 92vw);
+  padding: var(--modal-padding);
+  background: var(--surface-panel);
+  border-radius: var(--widget-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.analysis-settings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--widget-gap);
+}
+
+.analysis-settings__title {
+  color: var(--color-title);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.analysis-settings__close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--element-radius);
+  background: none;
+  color: var(--color-fg);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity var(--transition), background var(--transition);
+}
+
+.analysis-settings__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.analysis-settings__desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+
+.analysis-settings__section-label {
+  margin-bottom: var(--text-gap);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.analysis-settings__placeholder {
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.analysis-settings__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+}
+
+.analysis-settings__check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.analysis-settings__vessel-search {
+  position: relative;
+}
+
+.analysis-settings__vessel-search input,
+.analysis-settings__group-select {
+  width: 100%;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.analysis-settings__dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 2;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-control);
+  border-radius: var(--element-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+}
+
+.analysis-settings__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.analysis-settings__option:hover {
+  background: var(--surface-control-hover);
+}
+
+.analysis-settings__option-name {
+  font-size: 12px;
+}
+
+.analysis-settings__option-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.analysis-settings__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--text-gap);
+}
+
+.analysis-settings__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--text-gap);
+  padding: 3px 4px 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.analysis-settings__chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-fg);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.analysis-settings__chip button:hover {
+  background: var(--fixed-red);
+}
+
+.analysis-settings__hint {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
 .analysis-item {
   flex: 1;
   min-width: 0;
@@ -1231,6 +1425,41 @@ body {
   text-align: left;
   cursor: pointer;
   transition: background var(--transition);
+}
+
+/* Shortened applied-job row: clickable name + remove. */
+.applied-job-row {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  padding: var(--element-gap) var(--element-padding-y);
+  border-radius: var(--element-radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.applied-job-row__name {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.applied-job-row__name:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.applied-job-row__name:disabled {
+  cursor: default;
 }
 
 .recent-job-row:hover:not(:disabled) {

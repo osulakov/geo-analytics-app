@@ -8,17 +8,22 @@ import { useStores } from '../stores/StoreContext';
 /** Summary + name modal for saving the just-run job (and its events) to the DB. */
 export const SaveJobModal = observer(function SaveJobModal({ onClose }: { onClose: () => void }) {
   const { ping, aoi, analysis, job } = useStores();
-  const [name, setName] = useState('');
+  // Save As (from an opened job) prefills the existing name so it can be edited.
+  const [name, setName] = useState(
+    analysis.fromSavedJob ? (analysis.openedJobName ?? '') : '',
+  );
 
   const totalEvents = analysis.lastResults.reduce((sum, r) => sum + r.rows.length, 0);
   const analysisNames = analysis.addedConfigs.map((a) => a.name).join(', ') || '—';
   const aoiNames = aoi.aois.length > 0 ? aoi.aois.map((a) => a.name).join(', ') : 'Global (whole world)';
 
   const handleSave = async () => {
+    const configId = analysis.addedConfigs[0]?.id ?? 'geofence-enter-exit';
     const ok = await job.save({
       name,
-      // Hardcoded to the run analysis for now (single-analysis flow).
-      analysisConfigId: analysis.addedConfigs[0]?.id ?? 'geofence-enter-exit',
+      // Single-analysis flow for now.
+      analysisConfigId: configId,
+      analysisConfig: analysis.getSettings(configId),
       aoiWkt: aoisToWkt(aoi.aois),
       fromIso: ping.rangeStartIso ?? null,
       toIso: ping.rangeEndIso ?? null,

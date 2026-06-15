@@ -34,7 +34,7 @@ function searchableText(vessel: StaticVesselInfo): string {
  * ever rendered, regardless of how many vessels exist.
  */
 export const VesselsWidget = observer(function VesselsWidget() {
-  const { vessel, ping, globe, group } = useStores();
+  const { vessel, ping, globe, group, layers } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
@@ -89,11 +89,26 @@ export const VesselsWidget = observer(function VesselsWidget() {
     setPendingDelete(null);
   };
 
+  // The vessels shown mirror the device-tracks layer: "all device tracks" in the
+  // Data widget → every static vessel; a job's AOI-bounded device tracks → only
+  // the vessels that appear in those tracks.
+  const allTracks = layers.deviceTracksVisible;
+  const aoiTracksVisible = layers.isLayerVisible("device-tracks");
+  const aoiPings = ping.aoiPings;
+  const visibleVessels = useMemo(() => {
+    if (allTracks) return vessel.vessels;
+    if (aoiTracksVisible) {
+      const mmsis = new Set(aoiPings.map((p) => p.mmsi));
+      return vessel.vessels.filter((v) => mmsis.has(v.mmsi));
+    }
+    return [];
+  }, [allTracks, aoiTracksVisible, aoiPings, vessel.vessels]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return vessel.vessels;
-    return vessel.vessels.filter((v) => searchableText(v).includes(q));
-  }, [query, vessel.vessels]);
+    if (!q) return visibleVessels;
+    return visibleVessels.filter((v) => searchableText(v).includes(q));
+  }, [query, visibleVessels]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);

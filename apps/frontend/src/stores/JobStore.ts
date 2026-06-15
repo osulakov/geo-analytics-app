@@ -1,10 +1,13 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
+import type { AnalysisSettings } from '../analyses_configs';
 import type { AuthStore } from './AuthStore';
 
 export interface SaveJobInput {
   name: string;
   analysisConfigId: string;
+  /** The analysis settings the job ran with (detection toggles, vessels). */
+  analysisConfig: AnalysisSettings | null;
   aoiWkt: string | null;
   fromIso: string | null;
   toIso: string | null;
@@ -24,6 +27,8 @@ export class JobStore {
   error: string | null = null;
   /** The signed-in user's saved jobs (most recent first). */
   jobs: Job[] = [];
+  /** Jobs the user has opened/applied this session (most recent first). */
+  applied: Job[] = [];
 
   constructor(private auth: AuthStore) {
     makeAutoObservable(this, { auth: false } as never);
@@ -31,6 +36,19 @@ export class JobStore {
 
   get canSave(): boolean {
     return Boolean(this.auth.token);
+  }
+
+  isApplied(id: string): boolean {
+    return this.applied.some((j) => j.id === id);
+  }
+
+  /** Add a job to the applied list (most recent first; no duplicates). */
+  apply(job: Job): void {
+    this.applied = [job, ...this.applied.filter((j) => j.id !== job.id)];
+  }
+
+  unapply(id: string): void {
+    this.applied = this.applied.filter((j) => j.id !== id);
   }
 
   /** Fetch the signed-in user's saved jobs into `jobs`. */

@@ -219,6 +219,7 @@ interface JobRow {
   id: string;
   name: string;
   analysis_config_id: string;
+  analysis_config: unknown;
   aoi_wkt: string | null;
   from_ts: string | null;
   to_ts: string | null;
@@ -231,6 +232,7 @@ function mapJob(row: JobRow) {
     id: String(row.id),
     name: row.name,
     analysisConfigId: row.analysis_config_id,
+    analysisConfig: row.analysis_config ?? null,
     aoiWkt: row.aoi_wkt,
     fromIso: row.from_ts,
     toIso: row.to_ts,
@@ -239,12 +241,14 @@ function mapJob(row: JobRow) {
   };
 }
 
+const JOB_COLUMNS =
+  'id, name, analysis_config_id, analysis_config, aoi_wkt, from_ts, to_ts, event_count, created_at';
+
 // List the signed-in user's jobs.
 app.get('/jobs', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query<JobRow>(
-      `SELECT id, name, analysis_config_id, aoi_wkt, from_ts, to_ts, event_count, created_at
-         FROM jobs WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT ${JOB_COLUMNS} FROM jobs WHERE user_id = $1 ORDER BY created_at DESC`,
       [currentUserId(req)],
     );
     res.json(rows.map(mapJob));
@@ -257,27 +261,30 @@ app.get('/jobs', requireAuth, async (req, res) => {
 // Create a job. Only the job metadata is stored (its result events are not
 // persisted); event_count records how many the run produced.
 app.post('/jobs', requireAuth, async (req, res) => {
-  const { name, analysisConfigId, aoiWkt, fromIso, toIso, eventCount } = (req.body ?? {}) as {
-    name?: unknown;
-    analysisConfigId?: unknown;
-    aoiWkt?: unknown;
-    fromIso?: unknown;
-    toIso?: unknown;
-    eventCount?: unknown;
-  };
+  const { name, analysisConfigId, analysisConfig, aoiWkt, fromIso, toIso, eventCount } =
+    (req.body ?? {}) as {
+      name?: unknown;
+      analysisConfigId?: unknown;
+      analysisConfig?: unknown;
+      aoiWkt?: unknown;
+      fromIso?: unknown;
+      toIso?: unknown;
+      eventCount?: unknown;
+    };
   if (typeof name !== 'string' || !name.trim()) {
     res.status(400).json({ error: 'Job name is required' });
     return;
   }
   try {
     const { rows } = await pool.query<JobRow>(
-      `INSERT INTO jobs (user_id, name, analysis_config_id, aoi_wkt, from_ts, to_ts, event_count)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, analysis_config_id, aoi_wkt, from_ts, to_ts, event_count, created_at`,
+      `INSERT INTO jobs (user_id, name, analysis_config_id, analysis_config, aoi_wkt, from_ts, to_ts, event_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING ${JOB_COLUMNS}`,
       [
         currentUserId(req),
         name.trim(),
         String(analysisConfigId ?? ''),
+        analysisConfig == null ? null : JSON.stringify(analysisConfig),
         (aoiWkt as string | null) ?? null,
         (fromIso as string | null) ?? null,
         (toIso as string | null) ?? null,

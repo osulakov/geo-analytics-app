@@ -151,9 +151,10 @@ export class PingStore {
   }
 
   /** Load AOI-bounded device tracks (latest ping per vessel inside the AOIs)
-   *  for a job, or clear them when there's no AOI. Independent of the global
-   *  device-tracks layer. */
-  async loadAoiDeviceTracks(wkt: string | null): Promise<void> {
+   *  for a job, or clear them when there's no AOI. When `mmsis` is non-empty the
+   *  tracks are limited to those vessels (the analysis' selected vessels).
+   *  Independent of the global device-tracks layer. */
+  async loadAoiDeviceTracks(wkt: string | null, mmsis?: string[]): Promise<void> {
     if (!wkt) {
       runInAction(() => {
         this.aoiPings = [];
@@ -162,8 +163,10 @@ export class PingStore {
     }
     try {
       const pings = await fetchAoiDeviceTracks(wkt, this.rangeStartIso, this.rangeEndIso);
+      const allow = mmsis && mmsis.length > 0 ? new Set(mmsis) : null;
+      const result = allow ? pings.filter((p) => allow.has(p.mmsi)) : pings;
       runInAction(() => {
-        this.aoiPings = pings;
+        this.aoiPings = result;
       });
     } catch (error) {
       console.error('Failed to load AOI device tracks:', error);

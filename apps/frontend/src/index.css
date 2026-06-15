@@ -2922,6 +2922,20 @@ body {
   padding-right: 20px;
 }
 
+.group-edit__name-input {
+  width: 100%;
+  margin-bottom: var(--element-padding-x);
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--element-radius);
+  background: var(--surface-input);
+  color: var(--color-primary);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+}
+
 .group-edit__list {
   display: flex;
   flex-direction: column;

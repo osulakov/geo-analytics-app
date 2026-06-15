@@ -18,6 +18,7 @@ export const GroupEditModal = observer(function GroupEditModal({
 }: GroupEditModalProps) {
   const { group, vessel } = useStores();
   const [mmsis, setMmsis] = useState<string[]>(target.mmsis);
+  const [name, setName] = useState(target.name);
 
   const nameByMmsi = useMemo(
     () => new Map(vessel.vessels.map((v) => [v.mmsi, v.vesselName])),
@@ -27,7 +28,7 @@ export const GroupEditModal = observer(function GroupEditModal({
   const remove = (mmsi: string) => setMmsis((list) => list.filter((m) => m !== mmsi));
 
   const handleSave = () => {
-    void group.updateMembers(target.id, mmsis);
+    void group.updateMembers(target.id, mmsis, name.trim() || target.name);
     onClose();
   };
 
@@ -43,7 +44,13 @@ export const GroupEditModal = observer(function GroupEditModal({
           ×
         </button>
 
-        <div className="group-edit__title">{target.name}</div>
+        <input
+          className="group-edit__name-input"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Group name"
+          aria-label="Group name"
+        />
 
         <div className="group-edit__list">
           {mmsis.length === 0 ? (

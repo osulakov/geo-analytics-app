@@ -272,10 +272,15 @@ export function vesselsApiPlugin(): Plugin {
               const mmsis = Array.isArray(body.mmsis)
                 ? (body.mmsis as unknown[]).map(String)
                 : [];
+              // Optionally rename the group too (when a `name` is provided).
+              const name = typeof body.name === 'string' ? body.name.trim() : null;
               const { rows } = await getPool().query(
-                `UPDATE vessel_groups SET mmsis = $2 WHERE id = $1::int
-                 RETURNING id, name, mmsis`,
-                [groupMatch[1], mmsis],
+                `UPDATE vessel_groups
+                    SET mmsis = $2,
+                        name = COALESCE(NULLIF($3, ''), name)
+                  WHERE id = $1::int
+                  RETURNING id, name, mmsis`,
+                [groupMatch[1], mmsis, name],
               );
               if (rows.length === 0) {
                 json(404, { error: 'Group not found' });

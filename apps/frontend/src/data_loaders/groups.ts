@@ -38,12 +38,16 @@ export async function addGroupMember(groupId: number, mmsi: string): Promise<Ves
   return (await response.json()) as VesselGroup;
 }
 
-/** Replace a group's member list. */
-export async function updateGroupMembers(groupId: number, mmsis: string[]): Promise<VesselGroup> {
+/** Replace a group's member list and (optionally) rename it. */
+export async function updateGroupMembers(
+  groupId: number,
+  mmsis: string[],
+  name?: string,
+): Promise<VesselGroup> {
   const response = await fetch(`/api/groups/${groupId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mmsis }),
+    body: JSON.stringify(name === undefined ? { mmsis } : { mmsis, name }),
   });
   if (!response.ok) {
     throw new Error(`Failed to update group: ${response.status}`);

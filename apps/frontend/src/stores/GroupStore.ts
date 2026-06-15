@@ -48,9 +48,9 @@ export class GroupStore {
     }
   }
 
-  async updateMembers(groupId: number, mmsis: string[]): Promise<void> {
+  async updateMembers(groupId: number, mmsis: string[], name?: string): Promise<void> {
     try {
-      await updateGroupMembers(groupId, mmsis);
+      await updateGroupMembers(groupId, mmsis, name);
       await this.loadGroups();
     } catch (error) {
       console.error('Failed to update group:', error);

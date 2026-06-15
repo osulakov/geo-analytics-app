@@ -237,6 +237,15 @@ export interface EventHover {
   y: number;
 }
 
+/** A coordinate picked by double-clicking the globe. */
+export interface CoordinatePick {
+  lon: number;
+  lat: number;
+  /** Screen position of the double-click (for placing the popup). */
+  x: number;
+  y: number;
+}
+
 /** A satellite (ping or its coverage strip) under the cursor. */
 export interface SatelliteHover {
   satellite: Satellite;
@@ -259,6 +268,8 @@ interface GlobeCanvasProps {
   onSatelliteHover?: (hover: SatelliteHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
+  /** Called when the globe is double-clicked (null if off-globe). */
+  onPickCoordinate?: (pick: CoordinatePick | null) => void;
   /** Called (throttled, after the view settles) with the visible cap. */
   onViewportChange?: (cap: {
     lon: number;
@@ -352,6 +363,7 @@ export function GlobeCanvas({
   onEventHover,
   onSatelliteHover,
   onSelect,
+  onPickCoordinate,
   onViewportChange,
 }: GlobeCanvasProps) {
   const stores = useStores();
@@ -371,6 +383,8 @@ export function GlobeCanvas({
   onSatelliteHoverRef.current = onSatelliteHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onPickCoordinateRef = useRef(onPickCoordinate);
+  onPickCoordinateRef.current = onPickCoordinate;
   const onViewportChangeRef = useRef(onViewportChange);
   onViewportChangeRef.current = onViewportChange;
 
@@ -1222,6 +1236,17 @@ export function GlobeCanvas({
       zoomAtPointer(event.offsetX, event.offsetY, Math.exp(-event.deltaY * factor));
     };
 
+    // Double-click reports the geographic coordinate under the cursor.
+    const onDblClick = (event: MouseEvent) => {
+      if (!onPickCoordinateRef.current) return;
+      const geo = screenToLonLat(event.offsetX, event.offsetY);
+      if (!geo || !Number.isFinite(geo[0]) || !Number.isFinite(geo[1])) {
+        onPickCoordinateRef.current(null);
+        return;
+      }
+      onPickCoordinateRef.current({ lon: geo[0], lat: geo[1], x: event.offsetX, y: event.offsetY });
+    };
+
     // Esc cancels an in-progress AOI draft.
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && aoiStore.drawing) aoiStore.cancelDrawing();
@@ -1234,6 +1259,7 @@ export function GlobeCanvas({
     canvas.addEventListener('pointercancel', onPointerUp);
     canvas.addEventListener('pointerleave', onPointerLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('dblclick', onDblClick);
     window.addEventListener('keydown', onKeyDown);
 
     // --- Viewport reporting: emit the visible cap after the view settles ---
@@ -1302,6 +1328,7 @@ export function GlobeCanvas({
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('dblclick', onDblClick);
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [stores]);

@@ -1958,6 +1958,17 @@ body {
   background: var(--color-primary);
 }
 
+/* Center-top slot (formerly the chat widget): holds the Date Range widget. */
+.center-top {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: 21.5625vw;
+  min-width: 242px;
+}
+
 .chat-widget {
   position: fixed;
   top: 20px;
@@ -2830,6 +2841,89 @@ body {
   backdrop-filter: blur(6px);
   color: var(--color-fg);
   font-size: 12px;
+}
+
+/* Double-click coordinate popup (interactive — has a copy/close button). */
+.coord-popup {
+  position: fixed;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: var(--text-gap);
+  min-width: 150px;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  background: var(--surface-panel);
+  border: 1px solid var(--widget-border);
+  border-radius: var(--element-radius);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--widget-glow);
+  color: var(--color-fg);
+  font-size: 12px;
+}
+
+.coord-popup__close {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  color: var(--color-fg);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.coord-popup__close:hover {
+  opacity: 1;
+}
+
+.coord-popup__title {
+  color: var(--color-title);
+  font-size: 8.42px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coord-popup__rows {
+  margin: 0;
+  display: grid;
+  gap: var(--text-gap);
+}
+
+.coord-popup__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.coord-popup__rows dt {
+  opacity: 0.55;
+}
+
+.coord-popup__rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.coord-popup__copy {
+  margin-top: var(--text-gap);
+  padding: var(--space-2) var(--space-5);
+  border: none;
+  border-radius: var(--radius-xs);
+  background: var(--surface-control);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.coord-popup__copy:hover {
+  background: var(--surface-control-hover);
 }
 
 .aoi-tooltip {

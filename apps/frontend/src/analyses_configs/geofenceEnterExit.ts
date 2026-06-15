@@ -39,6 +39,7 @@ export const geofenceEnterExit: AnalysisConfig = {
       config: { aoi_bounded: true, can_get_full_path: true },
     },
   ],
+  supported_widgets: ["vessels", "layers", "timeslider"],
   defaultSettings: {
     detectEezCrossing: true,
     detectAoiCrossing: false,

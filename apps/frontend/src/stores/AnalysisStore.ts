@@ -1,6 +1,11 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 
-import { ANALYSES, type AnalysisConfig, type AnalysisSettings } from '../analyses_configs';
+import {
+  ANALYSES,
+  type AnalysisConfig,
+  type AnalysisSettings,
+  type SupportedWidget,
+} from '../analyses_configs';
 import { aoisToWkt } from '../analyses_configs/wkt';
 import { runQuery } from '../data_loaders/query';
 import type { MapEvent } from '../data_loaders/events';
@@ -88,6 +93,11 @@ export class AnalysisStore {
     return this.added
       .map((id) => ANALYSES.find((a) => a.id === id))
       .filter((a): a is AnalysisConfig => Boolean(a));
+  }
+
+  /** Whether any added analysis lists the given widget in supported_widgets. */
+  supportsWidget(widget: SupportedWidget): boolean {
+    return this.addedConfigs.some((c) => c.supported_widgets.includes(widget));
   }
 
   /** Flattened result rows as map events (for rendering the produced events). */

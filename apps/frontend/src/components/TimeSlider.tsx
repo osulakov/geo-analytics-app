@@ -43,7 +43,7 @@ function buildTicks(minMs: number, maxMs: number): Tick[] {
  * the global date range; releasing a handle reloads the map for that window.
  */
 export const TimeSlider = observer(function TimeSlider() {
-  const { ping } = useStores();
+  const { ping, analysis, layers } = useStores();
 
   const minMs = useMemo(() => Date.parse(`${ping.fromDate}T00:00:00Z`), [ping.fromDate]);
   const maxMs = useMemo(() => Date.parse(`${ping.toDate}T23:59:59Z`), [ping.toDate]);
@@ -117,6 +117,14 @@ export const TimeSlider = observer(function TimeSlider() {
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
   };
+
+  // Shown when an added analysis supports the time slider, there are results, or
+  // the global device-tracks layer (Data widget) is on.
+  const show =
+    analysis.supportsWidget('timeslider') ||
+    analysis.lastResults.length > 0 ||
+    layers.deviceTracksVisible;
+  if (!show) return null;
 
   return (
     <div className="time-slider">

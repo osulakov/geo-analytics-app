@@ -7,7 +7,7 @@ import { AoisWidget } from '../components/AoisWidget';
 import { AppliedJobsBar } from '../components/AppliedJobsBar';
 import { AoiTooltip } from '../layers_controller/AoiTooltip';
 import { Brand } from '../components/Brand';
-import { ChatWidget } from '../components/ChatWidget';
+import { CoordinatePopup } from '../components/CoordinatePopup';
 import { DateRangeWidget } from '../components/DateRangeWidget';
 import { EventCounter } from '../components/EventCounter';
 import { EezTooltip } from '../layers_controller/EezTooltip';
@@ -16,6 +16,7 @@ import {
   GlobeCanvas,
   type AoiHover,
   type EezHover,
+  type CoordinatePick,
   type EventHover,
   type PingHover,
   type SatelliteHover,
@@ -44,6 +45,7 @@ export function ExplorePage() {
   const [aoiHover, setAoiHover] = useState<AoiHover | null>(null);
   const [eventHover, setEventHover] = useState<EventHover | null>(null);
   const [satHover, setSatHover] = useState<SatelliteHover | null>(null);
+  const [coordPick, setCoordPick] = useState<CoordinatePick | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Top-left toolbar: radio-style — exactly one widget group is shown.
   const [activeNav, setActiveNav] = useState<'newJob' | 'recentJobs'>('newJob');
@@ -110,11 +112,15 @@ export function ExplorePage() {
         onEventHover={setEventHover}
         onSatelliteHover={setSatHover}
         onSelect={handleSelect}
+        onPickCoordinate={setCoordPick}
         onViewportChange={handleViewport}
       />
       <GlobeControls />
       <TimeSlider />
-      <ChatWidget />
+      {/* Date range sits center-top (the former chat/ask slot). */}
+      <div className="center-top">
+        <DateRangeWidget />
+      </div>
       <div className="right-stack">
         <WelcomeBadge />
         <div className="right-stack__counters">
@@ -153,7 +159,6 @@ export function ExplorePage() {
           </div>
           <div className="left-stack">
             {showNewJob && <AppliedJobsBar />}
-            {showNewJob && <DateRangeWidget />}
             {showNewJob && <AoisWidget />}
             {showNewJob && <AnalysesWidget />}
             {showNewJob && <RunJobWidget />}
@@ -194,6 +199,15 @@ export function ExplorePage() {
       )}
       {eezHover && !satHover && !hover && !eventHover && !aoiHover && !selected && (
         <EezTooltip name={eezHover.name} x={eezHover.x} y={eezHover.y} />
+      )}
+      {coordPick && (
+        <CoordinatePopup
+          lon={coordPick.lon}
+          lat={coordPick.lat}
+          x={coordPick.x}
+          y={coordPick.y}
+          onClose={() => setCoordPick(null)}
+        />
       )}
       {selected && (
         <VesselModal mmsi={selected} onClose={handleClose} onShowPath={handleShowPath} />

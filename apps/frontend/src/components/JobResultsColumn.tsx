@@ -12,11 +12,19 @@ import { useStores } from '../stores/StoreContext';
 export const JobResultsColumn = observer(function JobResultsColumn() {
   const { analysis, layers } = useStores();
   const hasResults = analysis.lastResults.length > 0;
-  if (!hasResults && !layers.deviceTracksVisible) return null;
+
+  // Widgets show per their own rules OR when an added analysis supports them.
+  // Vessels also shows when the global device-tracks layer is on (Data widget),
+  // even with no analysis added.
+  const showLayers = hasResults || analysis.supportsWidget('layers');
+  const showVessels =
+    hasResults || layers.deviceTracksVisible || analysis.supportsWidget('vessels');
+
+  if (!showLayers && !showVessels) return null;
   return (
     <div className="left-stack">
-      {hasResults && <LayersWidget />}
-      <VesselsWidget />
+      {showLayers && <LayersWidget />}
+      {showVessels && <VesselsWidget />}
     </div>
   );
 });

@@ -52,6 +52,9 @@ export interface LayerConfig {
   config?: LayerOptions;
 }
 
+/** UI widgets an analysis can surface when it's added. */
+export type SupportedWidget = 'vessels' | 'layers' | 'timeslider';
+
 /**
  * Declarative definition of an analysis. Each analysis is essentially a DB
  * query that can be scoped to an AOI polygon (WKT, WGS84) supplied at run time,
@@ -66,6 +69,9 @@ export interface AnalysisConfig {
   eventType: string;
   /** Map layers this analysis contributes (drives the Layers widget). */
   layers_config: LayerConfig[];
+  /** Widgets shown while this analysis is in the Added set (in addition to each
+   *  widget's own rules, e.g. device tracks → vessels). */
+  supported_widgets: SupportedWidget[];
   /** Default settings (shown in the settings modal, used when none saved). */
   defaultSettings: AnalysisSettings;
   /**

@@ -8,3 +8,5 @@ dist-ssr
 logs
 *.log
 npm-debug.log*
+
+.env

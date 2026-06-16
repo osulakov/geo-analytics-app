@@ -22,6 +22,11 @@ export default defineConfig({
         target: process.env.BACKEND_URL ?? 'http://localhost:4000',
         changeOrigin: true,
       },
+      // OpenAI image-analysis endpoint (backend).
+      '/openai': {
+        target: process.env.BACKEND_URL ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
       // Image storage microservice (media_bucket).
       '/media': {
         target: process.env.MEDIA_URL ?? 'http://localhost:4100',

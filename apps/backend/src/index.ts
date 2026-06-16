@@ -5,11 +5,19 @@ import bcrypt from 'bcryptjs';
 import { ensureSchema, pool } from './db';
 import { requireAuth, signToken, type TokenPayload } from './auth';
 
+// Load .env (OPENAI_API_KEY, etc.) from the backend dir when present.
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env file — rely on the ambient environment.
+}
+
 const PORT = Number(process.env.PORT ?? 4000);
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Allow large bodies: image-analysis requests carry base64-encoded images.
+app.use(express.json({ limit: '25mb' }));
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -295,6 +303,85 @@ app.post('/jobs', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[jobs] create failed:', error);
     res.status(500).json({ error: 'Failed to save job' });
+  }
+});
+
+// --- Image analysis (OpenAI vision) ----------------------------------------
+
+const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
+
+/** Normalise the UI-supplied image into a value OpenAI accepts as image_url:
+ *  a data URL, an http(s) URL, or raw base64 (wrapped with the given mime). */
+function toImageUrl(image: string, mimeType: string): string {
+  if (/^data:|^https?:\/\//i.test(image)) return image;
+  return `data:${mimeType};base64,${image}`;
+}
+
+// Send an image + prompt to OpenAI's vision model and return the text reply.
+app.post('/openai/analyze-image', async (req, res) => {
+  const { prompt, image, mimeType } = (req.body ?? {}) as {
+    prompt?: unknown;
+    image?: unknown;
+    mimeType?: unknown;
+  };
+  if (typeof prompt !== 'string' || !prompt.trim()) {
+    res.status(400).json({ error: 'prompt is required' });
+    return;
+  }
+  if (typeof image !== 'string' || !image.trim()) {
+    res.status(400).json({ error: 'image is required (data URL, http(s) URL, or base64)' });
+    return;
+  }
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('[openai] OPENAI_API_KEY is not set');
+    res.status(500).json({ error: 'OpenAI is not configured' });
+    return;
+  }
+
+  const imageUrl = toImageUrl(image.trim(), typeof mimeType === 'string' ? mimeType : 'image/jpeg');
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt.trim() },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: unknown;
+      error?: { message?: string };
+    };
+
+    if (!response.ok) {
+      console.error('[openai] request failed:', data?.error ?? response.statusText);
+      res.status(response.status).json({ error: data?.error?.message ?? 'OpenAI request failed' });
+      return;
+    }
+
+    res.json({
+      result: data.choices?.[0]?.message?.content ?? '',
+      model: OPENAI_MODEL,
+      usage: data.usage ?? null,
+    });
+  } catch (error) {
+    console.error('[openai] analyze-image failed:', error);
+    res.status(500).json({ error: 'Failed to analyze image' });
   }
 });
 

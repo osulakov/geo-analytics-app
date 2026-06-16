@@ -1931,15 +1931,6 @@ body {
   padding: 0;
 }
 
-.imagery-ingest-row {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.imagery-ingest-btn {
-  width: auto;
-}
-
 .imagery-list {
   display: flex;
   flex-direction: column;

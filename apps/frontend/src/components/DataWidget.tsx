@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import AnimationIcon from '@mui/icons-material/Animation';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
 import LayersIcon from '@mui/icons-material/Layers';
 import ImageIcon from '@mui/icons-material/Image';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
@@ -11,8 +12,7 @@ import { useStores } from '../stores/StoreContext';
 import triangleIcon from '../assets/analytics_triangle.svg?raw';
 import diamondIcon from '../assets/analytics_diamond.svg?raw';
 import { createMockDeviceTrack, type MockPing, type MockVessel } from '../data_loaders/mock';
-import { imageUrl } from '../data_loaders/media';
-import { ImageryIngestModal } from './ImageryIngestModal';
+import { imageUrl, uploadImage } from '../data_loaders/media';
 import type { Satellite } from '../data_loaders/satellites';
 
 const FLAGS = ['Panama', 'Liberia', 'Marshall Islands', 'Singapore', 'Malta', 'Greece'];
@@ -21,10 +21,15 @@ const NAMES = ['Star', 'Wave', 'Horizon', 'Vanguard', 'Meridian', 'Aurora', 'Fal
 const rand = (n: number) => Math.floor(Math.random() * n);
 const pick = <T,>(a: T[]): T => a[rand(a.length)];
 
-/** Format a stored image's ISO timestamp as a readable local date-time. */
+/** Format a stored image's ISO timestamp as `YYYY-MM-DD HH:MM` (UTC). */
 function formatImgTime(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
+    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
+  );
 }
 
 // Fraction of the viewport's smaller dimension the footprint should span when
@@ -238,14 +243,52 @@ export const DataWidget = observer(function DataWidget() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   // Active category tab. Layers is selected by default.
-  const [tab, setTab] = useState<'layers' | 'satellites' | 'ais' | 'imagery'>('layers');
-  // Whether the "Ingest imagery" modal is open.
-  const [ingestOpen, setIngestOpen] = useState(false);
+  const [tab, setTab] = useState<'layers' | 'satellites' | 'ais' | 'imagery' | 'ingest'>('layers');
+
+  // Imagery ingestion form state.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imgFile, setImgFile] = useState<File | null>(null);
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
+  const [satName, setSatName] = useState('');
+  const [imgWkt, setImgWkt] = useState('');
+  const [imgTimestamp, setImgTimestamp] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
 
   // Refresh stored imagery whenever the Imagery tab is shown.
   useEffect(() => {
     if (tab === 'imagery') void imagery.load();
   }, [tab, imagery]);
+
+  // Swap in a fresh object-URL preview for the chosen file, revoking the old one.
+  const pickFile = (file: File | null) => {
+    setImgFile(file);
+    setImgPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const handleUpload = async () => {
+    if (!imgFile) return;
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const meta = await uploadImage(imgFile, satName, imgWkt, imgTimestamp);
+      setUploadMsg(`Saved ${meta.filename}`);
+      pickFile(null);
+      setSatName('');
+      setImgWkt('');
+      setImgTimestamp('');
+      if (fileRef.current) fileRef.current.value = '';
+      void imagery.load();
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      setUploadMsg('Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Fly to an imagery footprint and zoom so its bbox fits the screen with a
   // ~50% margin (clamped to the max zoom for tiny footprints).
@@ -382,6 +425,17 @@ export const DataWidget = observer(function DataWidget() {
               onClick={() => setTab('imagery')}
             >
               <ImageIcon fontSize="small" sx={{ fontSize: 16 }} />
+            </button>
+            <button
+              type="button"
+              className={tab === 'ingest' ? 'active' : ''}
+              role="radio"
+              aria-checked={tab === 'ingest'}
+              title="Ingest imagery"
+              aria-label="Ingest imagery"
+              onClick={() => setTab('ingest')}
+            >
+              <AddPhotoAlternateIcon fontSize="small" sx={{ fontSize: 16 }} />
             </button>
           </div>
 
@@ -531,6 +585,27 @@ export const DataWidget = observer(function DataWidget() {
 
           {tab === 'ais' && (
             <>
+              <div className="mock-writer">
+                <div className="layer">
+                  <div className="layer__header">
+                    <span className="layer__leaf">
+                      <span
+                        className="layer__icon"
+                        style={{ color: DEVICE_TRACKS_COLOR }}
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{ __html: triangleIcon }}
+                      />
+                      <span className="layer__name">AIS Pings</span>
+                    </span>
+                    <Toggle
+                      on={layers.deviceTracksVisible}
+                      onChange={() => layers.toggleDeviceTracks()}
+                      label="Toggle AIS Pings layer"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="data-widget__group-label">Generate mock AIS data</div>
               <div className="mock-writer">
               {mock.drawing ? (
@@ -587,14 +662,62 @@ export const DataWidget = observer(function DataWidget() {
 
           {tab === 'imagery' && (
             <div className="mock-writer">
-              <div className="imagery-ingest-row">
-                <button
-                  type="button"
-                  className="mock-writer__create imagery-ingest-btn"
-                  onClick={() => setIngestOpen(true)}
-                >
-                  Ingest imagery
-                </button>
+              <div className="layer">
+                <div className="layer__header">
+                  <button
+                    type="button"
+                    className="layer__expand"
+                    aria-expanded={layers.imageryExpanded}
+                    onClick={() => layers.toggleImageryExpanded()}
+                  >
+                    <svg
+                      className={`layer__chevron${layers.imageryExpanded ? ' is-open' : ''}`}
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="9 6 15 12 9 18" />
+                    </svg>
+                    <span
+                      className="layer__icon"
+                      style={{ color: IMAGERY_COLOR }}
+                      aria-hidden="true"
+                      dangerouslySetInnerHTML={{ __html: diamondIcon }}
+                    />
+                    <span className="layer__name">Imagery</span>
+                  </button>
+                  <Toggle
+                    on={layers.imageryVisible}
+                    onChange={() => layers.toggleImagery()}
+                    label="Toggle Imagery layer"
+                  />
+                </div>
+                {layers.imageryExpanded && (
+                  <div className="layer__sublayers">
+                    <div className="sublayer">
+                      <span className="sublayer__name">Icon</span>
+                      <Toggle
+                        on={layers.imageryIconVisible}
+                        onChange={() => layers.toggleImageryIcon()}
+                        label="Toggle imagery icon sublayer"
+                      />
+                    </div>
+                    <div className="sublayer">
+                      <span className="sublayer__name">Image</span>
+                      <Toggle
+                        on={layers.imageryImageVisible}
+                        onChange={() => layers.toggleImageryImage()}
+                        label="Toggle imagery image sublayer"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="imagery-list">
@@ -630,10 +753,59 @@ export const DataWidget = observer(function DataWidget() {
               </div>
             </div>
           )}
+
+          {tab === 'ingest' && (
+            <>
+              <div className="data-widget__group-label">Ingest imagery</div>
+              <div className="mock-writer">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="imagery__file"
+                  aria-label="Image file"
+                  onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
+                />
+                {imgPreview && (
+                  <img className="imagery__preview" src={imgPreview} alt="Selected image preview" />
+                )}
+                <input
+                  type="text"
+                  className="mock-writer__select"
+                  placeholder="Satellite name"
+                  value={satName}
+                  onChange={(event) => setSatName(event.target.value)}
+                  aria-label="Satellite name"
+                />
+                <input
+                  type="text"
+                  className="mock-writer__select"
+                  placeholder="WKT (POLYGON((…)))"
+                  value={imgWkt}
+                  onChange={(event) => setImgWkt(event.target.value)}
+                  aria-label="Image WKT"
+                />
+                <input
+                  type="datetime-local"
+                  className="mock-writer__select"
+                  value={imgTimestamp}
+                  onChange={(event) => setImgTimestamp(event.target.value)}
+                  aria-label="Capture timestamp"
+                />
+                <button
+                  type="button"
+                  className="mock-writer__create"
+                  disabled={!imgFile || uploading}
+                  onClick={handleUpload}
+                >
+                  {uploading ? 'Uploading…' : 'Upload to media bucket'}
+                </button>
+                {uploadMsg && <div className="mock-writer__hint">{uploadMsg}</div>}
+              </div>
+            </>
+          )}
         </>
       )}
-
-      {ingestOpen && <ImageryIngestModal onClose={() => setIngestOpen(false)} />}
     </div>
   );
 });

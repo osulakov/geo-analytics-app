@@ -119,11 +119,12 @@ export const TimeSlider = observer(function TimeSlider() {
   };
 
   // Shown when an added analysis supports the time slider, there are results, or
-  // the global device-tracks layer (Data widget) is on.
+  // the global device-tracks / imagery layers (Data widget) are on.
   const show =
     analysis.supportsWidget('timeslider') ||
     analysis.lastResults.length > 0 ||
-    layers.deviceTracksVisible;
+    layers.deviceTracksVisible ||
+    layers.imageryVisible;
   if (!show) return null;
 
   return (

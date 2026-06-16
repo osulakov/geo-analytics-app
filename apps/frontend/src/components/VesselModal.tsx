@@ -14,11 +14,16 @@ function formatMetres(value: number | null): string {
   return value === null ? "—" : `${value} m`;
 }
 
-/** Render an ISO ping timestamp as a readable local date-time. */
+/** Render an ISO ping timestamp as `YYYY-MM-DD HH:MM` (UTC). */
 function formatTimestamp(iso: string | undefined): string {
   if (!iso) return "—";
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
+    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
+  );
 }
 
 /** Modal with a vessel's static info, "Show full path", and group actions. */

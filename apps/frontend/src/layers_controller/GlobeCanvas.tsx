@@ -662,6 +662,14 @@ export function GlobeCanvas({
       if (layerStore.imageryImageActive || layerStore.imageryIconActive) {
         const items = imageryStore.items;
         const imgHoverCheck = mouse.inside && !dragging;
+        // Imagery is filtered by the time-range slider (on its capture
+        // timestamp, falling back to upload time). Bad timestamps always show.
+        const imgWinStart = Date.parse(pingStore.windowStart);
+        const imgWinEnd = Date.parse(pingStore.windowEnd);
+        const inImgWindow = (item: (typeof items)[number]) => {
+          const t = Date.parse(item.meta.timestamp ?? item.meta.createdAt);
+          return Number.isNaN(t) || (t >= imgWinStart && t <= imgWinEnd);
+        };
         const setImageryHover = (item: (typeof items)[number]) => {
           imageryHover = {
             name: item.meta.satelliteName ?? item.meta.filename,
@@ -674,6 +682,7 @@ export function GlobeCanvas({
         if (layerStore.imageryImageActive) {
           for (const item of items) {
             if (!item.polygon || !item.center) continue;
+            if (!inImgWindow(item)) continue;
             if (geoDistance(item.center, aoiCenter) > Math.PI / 2) continue;
             // Project the ring; skip the footprint if any vertex wraps to the
             // far side (a planar fill would otherwise smear across the globe).
@@ -730,6 +739,7 @@ export function GlobeCanvas({
           const halfH = IMAGERY_ICON_H / 2;
           for (const item of items) {
             if (!item.center) continue;
+            if (!inImgWindow(item)) continue;
             if (geoDistance(item.center, aoiCenter) > Math.PI / 2) continue;
             const p = projection(item.center);
             if (!p) continue;

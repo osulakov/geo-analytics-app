@@ -479,6 +479,14 @@ body {
   bottom: auto;
 }
 
+/* Data-widget category tabs: the map-control buttons flowed in a row. */
+.data-widget__tabs {
+  flex-direction: row;
+  justify-content: center;
+  gap: var(--element-gap);
+  padding: 0 var(--widget-padding) var(--element-gap);
+}
+
 .right-stack {
   position: fixed;
   top: 20px;
@@ -1923,6 +1931,15 @@ body {
   padding: 0;
 }
 
+.imagery-ingest-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.imagery-ingest-btn {
+  width: auto;
+}
+
 .imagery-list {
   display: flex;
   flex-direction: column;
@@ -1933,9 +1950,25 @@ body {
   display: flex;
   align-items: center;
   gap: var(--element-gap);
+  width: 100%;
   padding: var(--element-padding-y);
+  border: none;
   border-radius: var(--element-radius);
   background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.imagery-item:hover:not(:disabled) {
+  background: var(--surface-control-hover);
+}
+
+.imagery-item:disabled {
+  cursor: default;
+  opacity: var(--disabled-opacity);
 }
 
 .imagery-item__thumb {

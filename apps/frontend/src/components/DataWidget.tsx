@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import AnimationIcon from '@mui/icons-material/Animation';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
+import LayersIcon from '@mui/icons-material/Layers';
+import ImageIcon from '@mui/icons-material/Image';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
@@ -9,7 +11,8 @@ import { useStores } from '../stores/StoreContext';
 import triangleIcon from '../assets/analytics_triangle.svg?raw';
 import diamondIcon from '../assets/analytics_diamond.svg?raw';
 import { createMockDeviceTrack, type MockPing, type MockVessel } from '../data_loaders/mock';
-import { uploadImage, imageUrl } from '../data_loaders/media';
+import { imageUrl } from '../data_loaders/media';
+import { ImageryIngestModal } from './ImageryIngestModal';
 import type { Satellite } from '../data_loaders/satellites';
 
 const FLAGS = ['Panama', 'Liberia', 'Marshall Islands', 'Singapore', 'Malta', 'Greece'];
@@ -22,6 +25,34 @@ const pick = <T,>(a: T[]): T => a[rand(a.length)];
 function formatImgTime(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+}
+
+// Fraction of the viewport's smaller dimension the footprint should span when
+// flying to an imagery item (0.5 → bbox fills half the screen, ~50% margin).
+const IMAGERY_FIT_FILL = 0.5;
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+/**
+ * Globe zoom that fits a footprint on screen with margin. In the orthographic
+ * projection a vertex at angular distance θ from the footprint centre lands at
+ * screen radius scale·sin(θ), and scale ≈ (minDim/2)·zoom — so the viewport
+ * dimensions cancel and zoom = FILL / sin(θ_max). Returns Infinity for a
+ * point-sized footprint (the caller clamps it to the max zoom).
+ */
+function fitZoom(center: [number, number], ring: [number, number][]): number {
+  const [lon0, lat0] = center;
+  const rLat0 = toRad(lat0);
+  let maxTheta = 0;
+  for (const [lon, lat] of ring) {
+    const rLat = toRad(lat);
+    const cosTheta =
+      Math.sin(rLat0) * Math.sin(rLat) +
+      Math.cos(rLat0) * Math.cos(rLat) * Math.cos(toRad(lon - lon0));
+    const theta = Math.acos(Math.min(1, Math.max(-1, cosTheta)));
+    if (theta > maxTheta) maxTheta = theta;
+  }
+  const s = Math.sin(maxTheta);
+  return s > 1e-6 ? IMAGERY_FIT_FILL / s : Number.POSITIVE_INFINITY;
 }
 
 /** Random vessel for a mocked device track. */
@@ -202,62 +233,26 @@ const SatelliteRow = observer(function SatelliteRow({ sat }: { sat: Satellite })
  * sections can be added below it. Mirrors the layout of the Vessels widget.
  */
 export const DataWidget = observer(function DataWidget() {
-  const { satellite, layers, mock, vessel, ping, group, imagery } = useStores();
+  const { satellite, layers, mock, vessel, ping, group, imagery, globe } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
-  // Mock Data Writer: collapsed by default; what to mock (more options coming).
-  const [mockOpen, setMockOpen] = useState(false);
-  const [mockTarget, setMockTarget] = useState('device-tracks');
-  const [imageryOpen, setImageryOpen] = useState(false);
-  // Satellites sub-section: collapsed by default.
-  const [satOpen, setSatOpen] = useState(false);
-  // Imagery sub-sections: collapsed by default.
+  // Active category tab. Layers is selected by default.
+  const [tab, setTab] = useState<'layers' | 'satellites' | 'ais' | 'imagery'>('layers');
+  // Whether the "Ingest imagery" modal is open.
   const [ingestOpen, setIngestOpen] = useState(false);
-  // Imagery ingestion form.
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [imgFile, setImgFile] = useState<File | null>(null);
-  const [imgPreview, setImgPreview] = useState<string | null>(null);
-  const [satName, setSatName] = useState('');
-  const [imgWkt, setImgWkt] = useState('');
-  const [imgTimestamp, setImgTimestamp] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
 
-  // Stored imagery lives in the shared store (also read by the map). Load it
-  // when the Imagery section opens and refresh it after each upload.
+  // Refresh stored imagery whenever the Imagery tab is shown.
   useEffect(() => {
-    if (imageryOpen) void imagery.load();
-  }, [imageryOpen, imagery]);
+    if (tab === 'imagery') void imagery.load();
+  }, [tab, imagery]);
 
-  // Swap in a fresh object-URL preview for the chosen file, revoking the old one.
-  const pickFile = (file: File | null) => {
-    setImgFile(file);
-    setImgPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return file ? URL.createObjectURL(file) : null;
-    });
-  };
-
-  const handleUpload = async () => {
-    if (!imgFile) return;
-    setUploading(true);
-    setUploadMsg(null);
-    try {
-      const meta = await uploadImage(imgFile, satName, imgWkt, imgTimestamp);
-      setUploadMsg(`Saved ${meta.filename}`);
-      pickFile(null);
-      setSatName('');
-      setImgWkt('');
-      setImgTimestamp('');
-      if (fileRef.current) fileRef.current.value = '';
-      void imagery.load();
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      setUploadMsg('Upload failed');
-    } finally {
-      setUploading(false);
-    }
+  // Fly to an imagery footprint and zoom so its bbox fits the screen with a
+  // ~50% margin (clamped to the max zoom for tiny footprints).
+  const flyToImagery = (item: (typeof imagery.items)[number]) => {
+    if (!item.center) return;
+    const zoom = item.polygon ? fitZoom(item.center, item.polygon) : undefined;
+    globe.flyTo(item.center[0], item.center[1], zoom);
   };
 
   // Mock a vessel + hourly device-track pings along the drawn line, then refetch.
@@ -298,7 +293,8 @@ export const DataWidget = observer(function DataWidget() {
     setQuery(value);
     setPage(0);
     if (value && !expanded) setExpanded(true);
-    if (value) setSatOpen(true);
+    // Search filters satellites, so jump to that tab when the user types.
+    if (value) setTab('satellites');
   };
 
   return (
@@ -338,58 +334,168 @@ export const DataWidget = observer(function DataWidget() {
 
       {expanded && (
         <>
-          <div className="data-widget__section-header">
-            <span className="data-widget__section-title">Satellites</span>
+          <div
+            className="globe-controls widget-toolbar data-widget__tabs"
+            role="radiogroup"
+            aria-label="Data category"
+          >
             <button
               type="button"
-              className={`satellite-row__icon${satellite.anyOrbitOn ? ' is-active' : ''}`}
-              title={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
-              aria-label={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
-              aria-pressed={satellite.anyOrbitOn}
-              onClick={() => satellite.toggleAllOrbits()}
+              className={tab === 'layers' ? 'active' : ''}
+              role="radio"
+              aria-checked={tab === 'layers'}
+              title="Layers"
+              aria-label="Layers"
+              onClick={() => setTab('layers')}
             >
-              <AnimationIcon fontSize="inherit" />
+              <LayersIcon fontSize="small" sx={{ fontSize: 17 }} />
             </button>
             <button
               type="button"
-              className={`satellite-row__icon${satellite.visible ? ' is-active' : ''}`}
-              title={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
-              aria-label={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
-              aria-pressed={satellite.visible}
-              onClick={() => satellite.toggleVisible()}
+              className={tab === 'satellites' ? 'active' : ''}
+              role="radio"
+              aria-checked={tab === 'satellites'}
+              title="Satellites"
+              aria-label="Satellites"
+              onClick={() => setTab('satellites')}
             >
-              {satellite.visible ? (
-                <VisibilityIcon fontSize="inherit" />
-              ) : (
-                <VisibilityOffIcon fontSize="inherit" />
-              )}
+              <SatelliteAltIcon fontSize="small" sx={{ fontSize: 16 }} />
             </button>
             <button
               type="button"
-              className="satellite-row__icon"
-              aria-label={satOpen ? 'Collapse satellites' : 'Expand satellites'}
-              aria-expanded={satOpen}
-              onClick={() => setSatOpen((o) => !o)}
+              className={`globe-controls__label${tab === 'ais' ? ' active' : ''}`}
+              role="radio"
+              aria-checked={tab === 'ais'}
+              title="AIS data"
+              aria-label="AIS data"
+              onClick={() => setTab('ais')}
             >
-              <svg
-                className={`mock-writer__chevron${satOpen ? ' is-open' : ''}`}
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              AIS
+            </button>
+            <button
+              type="button"
+              className={tab === 'imagery' ? 'active' : ''}
+              role="radio"
+              aria-checked={tab === 'imagery'}
+              title="Imagery"
+              aria-label="Imagery"
+              onClick={() => setTab('imagery')}
+            >
+              <ImageIcon fontSize="small" sx={{ fontSize: 16 }} />
             </button>
           </div>
 
-          {satOpen && (
+          {tab === 'layers' && (
+            <div className="mock-writer">
+              <div className="layer">
+                <div className="layer__header">
+                  <span className="layer__leaf">
+                    <span
+                      className="layer__icon"
+                      style={{ color: DEVICE_TRACKS_COLOR }}
+                      aria-hidden="true"
+                      dangerouslySetInnerHTML={{ __html: triangleIcon }}
+                    />
+                    <span className="layer__name">AIS Pings</span>
+                  </span>
+                  <Toggle
+                    on={layers.deviceTracksVisible}
+                    onChange={() => layers.toggleDeviceTracks()}
+                    label="Toggle AIS Pings layer"
+                  />
+                </div>
+              </div>
+
+              <div className="layer">
+                <div className="layer__header">
+                  <button
+                    type="button"
+                    className="layer__expand"
+                    aria-expanded={layers.imageryExpanded}
+                    onClick={() => layers.toggleImageryExpanded()}
+                  >
+                    <svg
+                      className={`layer__chevron${layers.imageryExpanded ? ' is-open' : ''}`}
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="9 6 15 12 9 18" />
+                    </svg>
+                    <span
+                      className="layer__icon"
+                      style={{ color: IMAGERY_COLOR }}
+                      aria-hidden="true"
+                      dangerouslySetInnerHTML={{ __html: diamondIcon }}
+                    />
+                    <span className="layer__name">Imagery</span>
+                  </button>
+                  <Toggle
+                    on={layers.imageryVisible}
+                    onChange={() => layers.toggleImagery()}
+                    label="Toggle Imagery layer"
+                  />
+                </div>
+                {layers.imageryExpanded && (
+                  <div className="layer__sublayers">
+                    <div className="sublayer">
+                      <span className="sublayer__name">Icon</span>
+                      <Toggle
+                        on={layers.imageryIconVisible}
+                        onChange={() => layers.toggleImageryIcon()}
+                        label="Toggle imagery icon sublayer"
+                      />
+                    </div>
+                    <div className="sublayer">
+                      <span className="sublayer__name">Image</span>
+                      <Toggle
+                        on={layers.imageryImageVisible}
+                        onChange={() => layers.toggleImageryImage()}
+                        label="Toggle imagery image sublayer"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'satellites' && (
             <>
+              <div className="data-widget__section-header">
+                <span className="data-widget__section-title">Satellites</span>
+                <button
+                  type="button"
+                  className={`satellite-row__icon${satellite.anyOrbitOn ? ' is-active' : ''}`}
+                  title={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+                  aria-label={satellite.anyOrbitOn ? 'Hide all orbits' : 'Show all orbits'}
+                  aria-pressed={satellite.anyOrbitOn}
+                  onClick={() => satellite.toggleAllOrbits()}
+                >
+                  <AnimationIcon fontSize="inherit" />
+                </button>
+                <button
+                  type="button"
+                  className={`satellite-row__icon${satellite.visible ? ' is-active' : ''}`}
+                  title={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+                  aria-label={satellite.visible ? 'Hide all satellites' : 'Show all satellites'}
+                  aria-pressed={satellite.visible}
+                  onClick={() => satellite.toggleVisible()}
+                >
+                  {satellite.visible ? (
+                    <VisibilityIcon fontSize="inherit" />
+                  ) : (
+                    <VisibilityOffIcon fontSize="inherit" />
+                  )}
+                </button>
+              </div>
+
               <div className="data-widget__list">
                 {pageItems.length === 0 ? (
                   <div className="data-widget__empty">No satellites found</div>
@@ -423,298 +529,111 @@ export const DataWidget = observer(function DataWidget() {
             </>
           )}
 
-          <div className="data-widget__group-label">AIS data</div>
-
-          <div className="data-widget__section-header">
-            <span
-              className="layer__icon"
-              style={{ color: DEVICE_TRACKS_COLOR }}
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: triangleIcon }}
-            />
-            <span className="data-widget__section-title">Device tracks</span>
-            <Toggle
-              on={layers.deviceTracksVisible}
-              onChange={() => layers.toggleDeviceTracks()}
-              label="Toggle Device tracks layer"
-            />
-          </div>
-
-          <div className="mock-writer-section">
-            <button
-              type="button"
-              className="mock-writer__header"
-              aria-expanded={mockOpen}
-              onClick={() => setMockOpen((o) => !o)}
-            >
-              <span>Mock Data Writer</span>
-              <svg
-                className={`mock-writer__chevron${mockOpen ? ' is-open' : ''}`}
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {mockOpen && (
+          {tab === 'ais' && (
+            <>
+              <div className="data-widget__group-label">Generate mock AIS data</div>
               <div className="mock-writer">
-                <select
-                  className="mock-writer__select"
-                  value={mockTarget}
-                  onChange={(event) => setMockTarget(event.target.value)}
-                  disabled={mock.drawing || mock.creating}
-                  aria-label="What to mock"
+              {mock.drawing ? (
+                <>
+                  <div className="mock-writer__drawing">
+                    Drawing device track — click to add points, double-click to finish.
+                  </div>
+                  <button type="button" className="mock-writer__start" onClick={() => mock.cancel()}>
+                    Cancel
+                  </button>
+                </>
+              ) : mock.hasTrack ? (
+                <button
+                  type="button"
+                  className="mock-writer__create"
+                  disabled={mock.creating}
+                  onClick={handleCreateTrack}
                 >
-                  <option value="device-tracks">Device tracks</option>
-                </select>
+                  {mock.creating ? 'Creating…' : 'Create device track'}
+                </button>
+              ) : (
+                <button type="button" className="mock-writer__start" onClick={() => mock.start()}>
+                  Start drawing vessel track
+                </button>
+              )}
 
-                {mock.drawing ? (
-                  <>
-                    <div className="mock-writer__drawing">
-                      Drawing device track — click to add points, double-click to finish.
-                    </div>
-                    <button
-                      type="button"
-                      className="mock-writer__start"
-                      onClick={() => mock.cancel()}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : mock.hasTrack ? (
-                  <button
-                    type="button"
-                    className="mock-writer__create"
-                    disabled={mock.creating}
-                    onClick={handleCreateTrack}
+              {mock.created && !mock.drawing && (
+                <div className="mock-writer__created">
+                  <div className="mock-writer__created-name">{mock.created.vesselName}</div>
+                  <div className="mock-writer__created-meta">
+                    {mock.created.mmsi} · {mock.created.flagState} · {mock.created.vesselType}
+                  </div>
+                  <select
+                    className="mock-writer__select"
+                    value=""
+                    aria-label="Add vessel to group"
+                    onChange={(event) => {
+                      const g = group.groups.find((x) => String(x.id) === event.target.value);
+                      if (g && mock.created) void group.addMember(g.id, mock.created.mmsi);
+                    }}
                   >
-                    {mock.creating ? 'Creating…' : 'Create device track'}
-                  </button>
+                    <option value="">Add to group…</option>
+                    {group.groups.map((g) => (
+                      <option key={g.id} value={String(g.id)}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              </div>
+            </>
+          )}
+
+          {tab === 'imagery' && (
+            <div className="mock-writer">
+              <div className="imagery-ingest-row">
+                <button
+                  type="button"
+                  className="mock-writer__create imagery-ingest-btn"
+                  onClick={() => setIngestOpen(true)}
+                >
+                  Ingest imagery
+                </button>
+              </div>
+
+              <div className="imagery-list">
+                {imagery.items.length === 0 ? (
+                  <div className="mock-writer__hint">No imagery yet.</div>
                 ) : (
-                  <button type="button" className="mock-writer__start" onClick={() => mock.start()}>
-                    Start drawing
-                  </button>
-                )}
-
-                {mock.created && !mock.drawing && (
-                  <div className="mock-writer__created">
-                    <div className="mock-writer__created-name">{mock.created.vesselName}</div>
-                    <div className="mock-writer__created-meta">
-                      {mock.created.mmsi} · {mock.created.flagState} · {mock.created.vesselType}
-                    </div>
-                    <select
-                      className="mock-writer__select"
-                      value=""
-                      aria-label="Add vessel to group"
-                      onChange={(event) => {
-                        const g = group.groups.find((x) => String(x.id) === event.target.value);
-                        if (g && mock.created) void group.addMember(g.id, mock.created.mmsi);
-                      }}
-                    >
-                      <option value="">Add to group…</option>
-                      {group.groups.map((g) => (
-                        <option key={g.id} value={String(g.id)}>
-                          {g.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="mock-writer-section">
-            <button
-              type="button"
-              className="mock-writer__header"
-              aria-expanded={imageryOpen}
-              onClick={() => setImageryOpen((o) => !o)}
-            >
-              <span>Imagery</span>
-              <svg
-                className={`mock-writer__chevron${imageryOpen ? ' is-open' : ''}`}
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {imageryOpen && (
-              <div className="mock-writer">
-                <div className="layer">
-                  <div className="layer__header">
+                  imagery.items.map((item) => (
                     <button
+                      key={item.meta.id}
                       type="button"
-                      className="layer__expand"
-                      aria-expanded={layers.imageryExpanded}
-                      onClick={() => layers.toggleImageryExpanded()}
+                      className="imagery-item"
+                      onClick={() => flyToImagery(item)}
+                      disabled={!item.center}
+                      title={item.center ? 'Fly to footprint' : 'No footprint'}
                     >
-                      <svg
-                        className={`layer__chevron${layers.imageryExpanded ? ' is-open' : ''}`}
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="9 6 15 12 9 18" />
-                      </svg>
-                      <span
-                        className="layer__icon"
-                        style={{ color: IMAGERY_COLOR }}
-                        aria-hidden="true"
-                        dangerouslySetInnerHTML={{ __html: diamondIcon }}
+                      <img
+                        className="imagery-item__thumb"
+                        src={imageUrl(item.meta.id)}
+                        alt={item.meta.filename}
+                        loading="lazy"
                       />
-                      <span className="layer__name">Imagery layer</span>
+                      <div className="imagery-item__meta">
+                        <span className="imagery-item__name">
+                          {item.meta.satelliteName ?? item.meta.filename}
+                        </span>
+                        <span className="imagery-item__time">
+                          {formatImgTime(item.meta.timestamp ?? item.meta.createdAt)}
+                        </span>
+                      </div>
                     </button>
-                    <Toggle
-                      on={layers.imageryVisible}
-                      onChange={() => layers.toggleImagery()}
-                      label="Toggle Imagery layer"
-                    />
-                  </div>
-                  {layers.imageryExpanded && (
-                    <div className="layer__sublayers">
-                      <div className="sublayer">
-                        <span className="sublayer__name">Icon</span>
-                        <Toggle
-                          on={layers.imageryIconVisible}
-                          onChange={() => layers.toggleImageryIcon()}
-                          label="Toggle imagery icon sublayer"
-                        />
-                      </div>
-                      <div className="sublayer">
-                        <span className="sublayer__name">Image</span>
-                        <Toggle
-                          on={layers.imageryImageVisible}
-                          onChange={() => layers.toggleImageryImage()}
-                          label="Toggle imagery image sublayer"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="imagery-subsection">
-                  <button
-                    type="button"
-                    className="imagery-subsection__header"
-                    aria-expanded={ingestOpen}
-                    onClick={() => setIngestOpen((o) => !o)}
-                  >
-                    <span>Ingest Imagery</span>
-                    <svg
-                      className={`mock-writer__chevron${ingestOpen ? ' is-open' : ''}`}
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-                  {ingestOpen && (
-                    <div className="mock-writer">
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*"
-                        className="imagery__file"
-                        aria-label="Image file"
-                        onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
-                      />
-                      {imgPreview && (
-                        <img className="imagery__preview" src={imgPreview} alt="Selected image preview" />
-                      )}
-                      <input
-                        type="text"
-                        className="mock-writer__select"
-                        placeholder="Satellite name"
-                        value={satName}
-                        onChange={(event) => setSatName(event.target.value)}
-                        aria-label="Satellite name"
-                      />
-                      <input
-                        type="text"
-                        className="mock-writer__select"
-                        placeholder="WKT (POLYGON((…)))"
-                        value={imgWkt}
-                        onChange={(event) => setImgWkt(event.target.value)}
-                        aria-label="Image WKT"
-                      />
-                      <input
-                        type="datetime-local"
-                        className="mock-writer__select"
-                        value={imgTimestamp}
-                        onChange={(event) => setImgTimestamp(event.target.value)}
-                        aria-label="Capture timestamp"
-                      />
-                      <button
-                        type="button"
-                        className="mock-writer__create"
-                        disabled={!imgFile || uploading}
-                        onClick={handleUpload}
-                      >
-                        {uploading ? 'Uploading…' : 'Upload to media bucket'}
-                      </button>
-                      {uploadMsg && <div className="mock-writer__hint">{uploadMsg}</div>}
-                    </div>
-                  )}
-                </div>
-
-                <div className="imagery-list">
-                  {imagery.items.length === 0 ? (
-                    <div className="mock-writer__hint">No imagery yet.</div>
-                  ) : (
-                    imagery.items.map(({ meta }) => (
-                      <div key={meta.id} className="imagery-item">
-                        <img
-                          className="imagery-item__thumb"
-                          src={imageUrl(meta.id)}
-                          alt={meta.filename}
-                          loading="lazy"
-                        />
-                        <div className="imagery-item__meta">
-                          <span className="imagery-item__name">
-                            {meta.satelliteName ?? meta.filename}
-                          </span>
-                          <span className="imagery-item__time">
-                            {formatImgTime(meta.timestamp ?? meta.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                  ))
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
+
+      {ingestOpen && <ImageryIngestModal onClose={() => setIngestOpen(false)} />}
     </div>
   );
 });

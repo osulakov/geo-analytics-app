@@ -48,6 +48,8 @@ export class GlobeStore {
   flying = false;
   private targetLambda = 0;
   private targetPhi = DEFAULT_PHI;
+  // Target zoom for the current flight, or null to leave zoom unchanged.
+  private targetZoom: number | null = null;
 
   constructor() {
     makeAutoObservable(this);
@@ -83,10 +85,12 @@ export class GlobeStore {
     this.rotationPhi = clamp(phi, -MAX_PHI, MAX_PHI);
   }
 
-  /** Smoothly rotate so (lon, lat) ends up at the centre. Zoom is unchanged. */
-  flyTo(lon: number, lat: number): void {
+  /** Smoothly rotate so (lon, lat) ends up at the centre. When `zoom` is given,
+   *  the view also animates to that zoom level; otherwise zoom is unchanged. */
+  flyTo(lon: number, lat: number, zoom?: number): void {
     this.targetLambda = -lon;
     this.targetPhi = clamp(-lat, -MAX_PHI, MAX_PHI);
+    this.targetZoom = zoom != null ? clamp(zoom, MIN_ZOOM, MAX_ZOOM) : null;
     this.spinning = false;
     this.flying = true;
   }
@@ -105,16 +109,19 @@ export class GlobeStore {
     if (dLambda > 180) dLambda -= 360;
     if (dLambda < -180) dLambda += 360;
     const dPhi = this.targetPhi - this.rotationPhi;
+    const dZoom = this.targetZoom != null ? this.targetZoom - this.zoom : 0;
 
-    if (Math.abs(dLambda) < 0.05 && Math.abs(dPhi) < 0.05) {
+    if (Math.abs(dLambda) < 0.05 && Math.abs(dPhi) < 0.05 && Math.abs(dZoom) < 0.01) {
       this.rotationLambda = this.targetLambda;
       this.rotationPhi = this.targetPhi;
+      if (this.targetZoom != null) this.zoom = this.targetZoom;
       this.flying = false;
       return;
     }
 
     this.rotationLambda += dLambda * alpha;
     this.rotationPhi += dPhi * alpha;
+    if (this.targetZoom != null) this.zoom += dZoom * alpha;
   }
 
   setSpinning(spinning: boolean): void {

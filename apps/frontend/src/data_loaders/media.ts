@@ -43,3 +43,11 @@ export async function listImages(): Promise<UploadedImage[]> {
 export function imageUrl(id: string): string {
   return `/media/images/${id}`;
 }
+
+/** Delete a stored image (and its metadata) from the media bucket. */
+export async function deleteImage(id: string): Promise<void> {
+  const response = await fetch(`/media/images/${id}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Failed to delete image: ${response.status}`);
+  }
+}

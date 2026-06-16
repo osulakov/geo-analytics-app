@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { observer } from 'mobx-react-lite';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 
@@ -24,6 +25,21 @@ export const RecentJobsWidget = observer(function RecentJobsWidget() {
   const [expanded, setExpanded] = useState(true);
   const [query, setQuery] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Job | null>(null);
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    const wasApplied = job.isApplied(id);
+    setPendingDelete(null);
+    await job.deleteJob(id);
+    // If it was on the map, drop it from the applied set and recombine so its
+    // events/detections/layers are cleared.
+    if (wasApplied) {
+      job.unapply(id);
+      await applyJobs(job.applied);
+    }
+  };
 
   useEffect(() => {
     void job.loadJobs();
@@ -137,25 +153,60 @@ export const RecentJobsWidget = observer(function RecentJobsWidget() {
           ) : (
             <div className="data-widget__list">
               {filtered.map((saved) => (
-                <button
-                  key={saved.id}
-                  type="button"
-                  className="recent-job-row"
-                  disabled={openingId !== null}
-                  onClick={() => handleOpen(saved)}
-                >
-                  <span className="recent-job-row__name">{saved.name}</span>
-                  <span className="recent-job-row__meta">
-                    {formatDate(saved.createdAt)} · {saved.eventCount} events
-                    {saved.aoiWkt ? ' · AOI' : ' · global'}
-                    {openingId === saved.id ? ' · opening…' : ''}
-                  </span>
-                </button>
+                <div key={saved.id} className="recent-job-row-wrap">
+                  <button
+                    type="button"
+                    className="recent-job-row"
+                    disabled={openingId !== null}
+                    onClick={() => handleOpen(saved)}
+                  >
+                    <span className="recent-job-row__name">{saved.name}</span>
+                    <span className="recent-job-row__meta">
+                      {formatDate(saved.createdAt)} · {saved.eventCount} events
+                      {saved.aoiWkt ? ' · AOI' : ' · global'}
+                      {openingId === saved.id ? ' · opening…' : ''}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="aoi-row__trash"
+                    title="Delete job"
+                    aria-label="Delete job"
+                    onClick={() => setPendingDelete(saved)}
+                  >
+                    <DeleteOutlineIcon fontSize="inherit" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       )}
+
+      {pendingDelete &&
+        createPortal(
+          <div className="confirm-dialog__overlay" onClick={() => setPendingDelete(null)}>
+            <div className="confirm-dialog" onClick={(event) => event.stopPropagation()}>
+              <div className="confirm-dialog__text">
+                Delete job “{pendingDelete.name}”? This also removes its results and detected
+                objects. This cannot be undone.
+              </div>
+              <div className="confirm-dialog__actions">
+                <button
+                  type="button"
+                  className="confirm-dialog__cancel"
+                  onClick={() => setPendingDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="confirm-dialog__delete" onClick={confirmDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });

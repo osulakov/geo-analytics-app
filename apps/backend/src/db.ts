@@ -58,4 +58,20 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE IF EXISTS events
       ADD COLUMN IF NOT EXISTS job_id BIGINT REFERENCES jobs(id) ON DELETE CASCADE;
   `);
+
+  // Objects detected from imagery by an analysis (e.g. OpenAI vision). Each row
+  // is one detected object: a GeoJSON Polygon geometry (lon/lat), the OpenAI +
+  // imagery metadata, and the source imagery timestamp, all under a job.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS detected_objects (
+      id          BIGSERIAL PRIMARY KEY,
+      job_id      BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      image_id    TEXT,
+      geojson     JSONB NOT NULL,
+      metadata    JSONB,
+      ts          TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS detected_objects_job_id_idx ON detected_objects (job_id);
+  `);
 }

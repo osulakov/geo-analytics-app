@@ -90,6 +90,52 @@ export class JobStore {
     }
   }
 
+  /** Create a job row in the DB and return it (used by analyses that need a
+   *  job_id before they run, e.g. object detection). Prepends to `jobs` so it
+   *  shows up in Recent jobs immediately. Returns null if not signed in / on error. */
+  async createRemote(input: SaveJobInput): Promise<Job | null> {
+    if (!this.auth.token) {
+      this.error = 'You must be signed in to run this job';
+      return null;
+    }
+    try {
+      const res = await fetch('/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.auth.token}` },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return null;
+      const created = (await res.json()) as Job;
+      runInAction(() => {
+        this.jobs = [created, ...this.jobs];
+      });
+      return created;
+    } catch (error) {
+      console.error('Failed to create job:', error);
+      return null;
+    }
+  }
+
+  /** Delete a saved job from the DB (its events + detections cascade). Removes
+   *  it from the Recent jobs list; leaves the applied list untouched. */
+  async deleteJob(id: string): Promise<boolean> {
+    if (!this.auth.token) return false;
+    try {
+      const res = await fetch(`/jobs/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${this.auth.token}` },
+      });
+      if (!res.ok && res.status !== 404) return false;
+      runInAction(() => {
+        this.jobs = this.jobs.filter((j) => j.id !== id);
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      return false;
+    }
+  }
+
   async save(input: SaveJobInput): Promise<boolean> {
     if (!this.auth.token) {
       this.error = 'You must be signed in to save a job';

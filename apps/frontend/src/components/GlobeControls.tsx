@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
+import RoomIcon from '@mui/icons-material/Room';
 
 import { useStores } from '../stores/StoreContext';
 
@@ -18,6 +19,8 @@ const SPEEDS: { value: number; label: string }[] = [
 export const GlobeControls = observer(function GlobeControls() {
   const { globe } = useStores();
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [pinMenuOpen, setPinMenuOpen] = useState(false);
+  const [pinInput, setPinInput] = useState('');
 
   // Close the speed menu on any click outside the play control.
   useEffect(() => {
@@ -26,6 +29,24 @@ export const GlobeControls = observer(function GlobeControls() {
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
   }, [speedMenuOpen]);
+
+  // Close the pin menu on any click outside the pin control.
+  useEffect(() => {
+    if (!pinMenuOpen) return;
+    const close = () => setPinMenuOpen(false);
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [pinMenuOpen]);
+
+  // Parse "lat, lon" (the app's coordinate convention) and drop + fly to a pin.
+  const submitPin = () => {
+    const parts = pinInput.split(/[,\s]+/).map(Number).filter((n) => !Number.isNaN(n));
+    if (parts.length < 2) return;
+    const [lat, lon] = parts;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+    globe.dropPin(lon, lat);
+    setPinMenuOpen(false);
+  };
 
   return (
     <div className="globe-controls">
@@ -135,6 +156,44 @@ export const GlobeControls = observer(function GlobeControls() {
                 {s.label}
               </button>
             ))}
+          </div>
+        )}
+      </div>
+      <div className="globe-controls__pin" onPointerDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className={globe.pin ? 'active' : undefined}
+          title="Go to coordinates"
+          aria-label="Go to coordinates"
+          aria-haspopup="dialog"
+          aria-expanded={pinMenuOpen}
+          onClick={() => setPinMenuOpen((o) => !o)}
+        >
+          <RoomIcon fontSize="small" />
+        </button>
+        {pinMenuOpen && (
+          <div className="globe-controls__pin-menu">
+            <input
+              type="text"
+              autoFocus
+              className="globe-controls__pin-input"
+              placeholder="lat, lon"
+              aria-label="Coordinates (lat, lon)"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitPin();
+              }}
+            />
+            {globe.pin && (
+              <button
+                type="button"
+                className="globe-controls__pin-clear"
+                onClick={() => globe.clearPin()}
+              >
+                Remove pin
+              </button>
+            )}
           </div>
         )}
       </div>

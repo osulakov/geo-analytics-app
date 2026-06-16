@@ -230,6 +230,56 @@ body {
   background: var(--accent-soft);
 }
 
+/* Pin (go-to-coordinates) control: a side dropdown with an input. */
+.globe-controls__pin {
+  position: relative;
+  width: 36px;
+  height: 36px;
+}
+
+.globe-controls__pin-menu {
+  position: absolute;
+  right: calc(100% + var(--element-gap));
+  bottom: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-control);
+  border-radius: var(--element-radius);
+  backdrop-filter: var(--blur-control);
+  box-shadow: var(--widget-glow);
+}
+
+.globe-controls__pin-input {
+  width: 160px;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  border: none;
+  border-radius: var(--radius-xs);
+  background: var(--surface-input);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.globe-controls .globe-controls__pin-clear {
+  width: auto;
+  height: auto;
+  justify-content: flex-start;
+  padding: var(--element-padding-y) var(--element-padding-x);
+  font-size: 11px;
+  white-space: nowrap;
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: var(--radius-xs);
+}
+
+.globe-controls .globe-controls__pin-clear:hover {
+  background: var(--surface-control-hover);
+}
+
 /* Top-left region: logo on top, then a row of [toolbar rail | widgets]. */
 .left-region {
   position: fixed;
@@ -1678,6 +1728,18 @@ body {
   padding: 0 var(--widget-padding) var(--element-gap);
 }
 
+/* A saved-job row in the Recent jobs list: clickable open area + delete. */
+.recent-job-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.recent-job-row-wrap .recent-job-row {
+  flex: 1;
+  min-width: 0;
+}
+
 /* A saved-job row in the Recent jobs list (click to re-open the job). */
 .recent-job-row {
   display: flex;
@@ -1935,6 +1997,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--element-gap);
+}
+
+.imagery-item-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.imagery-item-wrap .imagery-item {
+  flex: 1;
+  min-width: 0;
 }
 
 .imagery-item {

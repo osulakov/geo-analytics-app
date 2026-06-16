@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { observer } from 'mobx-react-lite';
 import AnimationIcon from '@mui/icons-material/Animation';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
 import LayersIcon from '@mui/icons-material/Layers';
 import ImageIcon from '@mui/icons-material/Image';
@@ -254,11 +256,18 @@ export const DataWidget = observer(function DataWidget() {
   const [imgTimestamp, setImgTimestamp] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  // Imagery pending deletion (shows the confirm modal).
+  const [pendingImage, setPendingImage] = useState<{ id: string; name: string } | null>(null);
 
   // Refresh stored imagery whenever the Imagery tab is shown.
   useEffect(() => {
     if (tab === 'imagery') void imagery.load();
   }, [tab, imagery]);
+
+  const confirmDeleteImage = async () => {
+    if (pendingImage) await imagery.remove(pendingImage.id);
+    setPendingImage(null);
+  };
 
   // Swap in a fresh object-URL preview for the chosen file, revoking the old one.
   const pickFile = (file: File | null) => {
@@ -725,29 +734,44 @@ export const DataWidget = observer(function DataWidget() {
                   <div className="mock-writer__hint">No imagery yet.</div>
                 ) : (
                   imagery.items.map((item) => (
-                    <button
-                      key={item.meta.id}
-                      type="button"
-                      className="imagery-item"
-                      onClick={() => flyToImagery(item)}
-                      disabled={!item.center}
-                      title={item.center ? 'Fly to footprint' : 'No footprint'}
-                    >
-                      <img
-                        className="imagery-item__thumb"
-                        src={imageUrl(item.meta.id)}
-                        alt={item.meta.filename}
-                        loading="lazy"
-                      />
-                      <div className="imagery-item__meta">
-                        <span className="imagery-item__name">
-                          {item.meta.satelliteName ?? item.meta.filename}
-                        </span>
-                        <span className="imagery-item__time">
-                          {formatImgTime(item.meta.timestamp ?? item.meta.createdAt)}
-                        </span>
-                      </div>
-                    </button>
+                    <div key={item.meta.id} className="imagery-item-wrap">
+                      <button
+                        type="button"
+                        className="imagery-item"
+                        onClick={() => flyToImagery(item)}
+                        disabled={!item.center}
+                        title={item.center ? 'Fly to footprint' : 'No footprint'}
+                      >
+                        <img
+                          className="imagery-item__thumb"
+                          src={imageUrl(item.meta.id)}
+                          alt={item.meta.filename}
+                          loading="lazy"
+                        />
+                        <div className="imagery-item__meta">
+                          <span className="imagery-item__name">
+                            {item.meta.satelliteName ?? item.meta.filename}
+                          </span>
+                          <span className="imagery-item__time">
+                            {formatImgTime(item.meta.timestamp ?? item.meta.createdAt)}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="aoi-row__trash"
+                        title="Delete imagery"
+                        aria-label="Delete imagery"
+                        onClick={() =>
+                          setPendingImage({
+                            id: item.meta.id,
+                            name: item.meta.satelliteName ?? item.meta.filename,
+                          })
+                        }
+                      >
+                        <DeleteOutlineIcon fontSize="inherit" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -806,6 +830,34 @@ export const DataWidget = observer(function DataWidget() {
           )}
         </>
       )}
+
+      {pendingImage &&
+        createPortal(
+          <div className="confirm-dialog__overlay" onClick={() => setPendingImage(null)}>
+            <div className="confirm-dialog" onClick={(event) => event.stopPropagation()}>
+              <div className="confirm-dialog__text">
+                Delete imagery “{pendingImage.name}” from the media bucket? This cannot be undone.
+              </div>
+              <div className="confirm-dialog__actions">
+                <button
+                  type="button"
+                  className="confirm-dialog__cancel"
+                  onClick={() => setPendingImage(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="confirm-dialog__delete"
+                  onClick={confirmDeleteImage}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });

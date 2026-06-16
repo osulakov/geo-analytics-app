@@ -10,13 +10,15 @@ import { useStores } from '../stores/StoreContext';
  * global device-tracks layer (Data widget) is on.
  */
 export const JobResultsColumn = observer(function JobResultsColumn() {
-  const { analysis, layers } = useStores();
+  const { analysis, layers, detection } = useStores();
   const hasResults = analysis.lastResults.length > 0;
 
   // Widgets show per their own rules OR when an added analysis supports them.
   // Vessels also shows when the global device-tracks layer is on (Data widget),
-  // even with no analysis added.
-  const showLayers = hasResults || analysis.supportsWidget('layers');
+  // even with no analysis added. Detections (object-detection jobs) persist
+  // results without populating lastResults, so show Layers when any are loaded.
+  const showLayers =
+    hasResults || analysis.supportsWidget('layers') || detection.items.length > 0;
   const showVessels =
     hasResults || layers.deviceTracksVisible || analysis.supportsWidget('vessels');
 

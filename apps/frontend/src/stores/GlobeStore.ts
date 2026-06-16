@@ -44,6 +44,9 @@ export class GlobeStore {
   /** Whether the Exclusive Economic Zone (EEZ) boundaries are drawn. */
   showEez = false;
 
+  /** A user-dropped pin (lon/lat), shown on the globe. Null when none. */
+  pin: { lon: number; lat: number } | null = null;
+
   /** Smooth "fly to" animation state. */
   flying = false;
   private targetLambda = 0;
@@ -138,6 +141,16 @@ export class GlobeStore {
 
   toggleEez(): void {
     this.showEez = !this.showEez;
+  }
+
+  /** Drop a pin at (lon, lat) and fly to it at a close zoom. */
+  dropPin(lon: number, lat: number): void {
+    this.pin = { lon, lat };
+    this.flyTo(lon, lat, 100);
+  }
+
+  clearPin(): void {
+    this.pin = null;
   }
 
   setRpm(rpm: number): void {

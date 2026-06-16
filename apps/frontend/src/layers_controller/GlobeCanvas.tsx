@@ -64,6 +64,13 @@ let imageryIconReady = false;
     encodeURIComponent(analyticsDiamondRaw.replace(/currentColor/g, IMAGERY_COLOR));
 }
 
+// Object-detection polygons: cyan footprint fill + stroke.
+const DETECTION_STROKE = '#22d3ee';
+const DETECTION_FILL = 'rgba(34, 211, 238, 0.22)';
+
+// User-dropped location pin (the map-controls "Room" pin).
+const PIN_COLOR = '#ef4444';
+
 // AIS-off (gap) events: orange upward triangle drawn directly on the canvas.
 const AIS_OFF_COLOR = '#ef6a20';
 const AIS_OFF_SIZE = 14;
@@ -273,6 +280,14 @@ export interface ImageryHover {
   y: number;
 }
 
+/** A detected-object polygon under the cursor (carries its full metadata). */
+export interface DetectionHover {
+  metadata: Record<string, unknown> | null;
+  timestamp: string | null;
+  x: number;
+  y: number;
+}
+
 /** A coordinate picked by double-clicking the globe. */
 export interface CoordinatePick {
   lon: number;
@@ -304,6 +319,8 @@ interface GlobeCanvasProps {
   onSatelliteHover?: (hover: SatelliteHover | null) => void;
   /** Called when the hovered imagery footprint (icon or raster) changes. */
   onImageryHover?: (hover: ImageryHover | null) => void;
+  /** Called when the hovered detected-object polygon changes (full metadata). */
+  onDetectionHover?: (hover: DetectionHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
   /** Called when the globe is double-clicked (null if off-globe). */
@@ -401,6 +418,7 @@ export function GlobeCanvas({
   onEventHover,
   onSatelliteHover,
   onImageryHover,
+  onDetectionHover,
   onSelect,
   onPickCoordinate,
   onViewportChange,
@@ -422,6 +440,8 @@ export function GlobeCanvas({
   onSatelliteHoverRef.current = onSatelliteHover;
   const onImageryHoverRef = useRef(onImageryHover);
   onImageryHoverRef.current = onImageryHover;
+  const onDetectionHoverRef = useRef(onDetectionHover);
+  onDetectionHoverRef.current = onDetectionHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onPickCoordinateRef = useRef(onPickCoordinate);
@@ -445,6 +465,7 @@ export function GlobeCanvas({
     const aoiStore = stores.aoi;
     const mockStore = stores.mock;
     const imageryStore = stores.imagery;
+    const detectionStore = stores.detection;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
@@ -470,6 +491,8 @@ export function GlobeCanvas({
     let aoiHoveredId: string | null = null;
     // Id of the hovered imagery footprint (for change detection).
     let imageryHoveredId: string | null = null;
+    // Id of the hovered detected-object polygon (for change detection).
+    let detectionHoveredId: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -751,6 +774,55 @@ export function GlobeCanvas({
             ) {
               setImageryHover(item);
             }
+          }
+        }
+      }
+
+      // Object detections: GeoJSON polygons produced by the object-detection
+      // analysis, drawn as filled cyan footprints. Filtered by the time-range
+      // slider on each detection's imagery timestamp.
+      let detectionHover: DetectionHover | null = null;
+      let detectionHoverId: string | null = null;
+      if (layerStore.isLayerVisible('object-detections')) {
+        const detWinStart = Date.parse(pingStore.windowStart);
+        const detWinEnd = Date.parse(pingStore.windowEnd);
+        const detHoverCheck = mouse.inside && !dragging;
+        for (const item of detectionStore.items) {
+          if (!item.ring || !item.center) continue;
+          if (!Number.isNaN(item.tMs) && (item.tMs < detWinStart || item.tMs > detWinEnd)) continue;
+          if (geoDistance(item.center, aoiCenter) > Math.PI / 2) continue;
+          const pts: [number, number][] = [];
+          let ok = true;
+          for (const v of item.ring) {
+            if (geoDistance(v, aoiCenter) > Math.PI / 2) {
+              ok = false;
+              break;
+            }
+            const p = projection(v);
+            if (!p) {
+              ok = false;
+              break;
+            }
+            pts.push([p[0], p[1]]);
+          }
+          if (!ok || pts.length < 3) continue;
+          ctx.beginPath();
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.closePath();
+          ctx.fillStyle = DETECTION_FILL;
+          ctx.fill();
+          ctx.strokeStyle = DETECTION_STROKE;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+          if (detHoverCheck && pointInPolygon(mouse.x, mouse.y, pts)) {
+            detectionHover = {
+              metadata: item.detection.metadata,
+              timestamp: item.detection.ts,
+              x: mouse.x,
+              y: mouse.y,
+            };
+            detectionHoverId = item.detection.id;
           }
         }
       }
@@ -1150,6 +1222,38 @@ export function GlobeCanvas({
         onSatelliteHoverRef.current?.(satHover);
       }
 
+      // User-dropped pin, drawn on top of everything as a classic teardrop
+      // marker whose tip sits exactly on the coordinate.
+      if (globe.pin) {
+        const pinCoord: [number, number] = [globe.pin.lon, globe.pin.lat];
+        if (geoDistance(pinCoord, center) <= Math.PI / 2) {
+          const pp = projection(pinCoord);
+          if (pp) {
+            const [px, py] = pp;
+            const r = 7;
+            const headY = py - 22;
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(px - r * 0.85, headY);
+            ctx.lineTo(px + r * 0.85, headY);
+            ctx.closePath();
+            ctx.fillStyle = PIN_COLOR;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(px, headY, r, 0, 2 * Math.PI);
+            ctx.fillStyle = PIN_COLOR;
+            ctx.fill();
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(px, headY, r * 0.42, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+          }
+        }
+      }
+
       // Notify when the hovered ping changes (keyed on mmsi + timestamp so
       // moving between pings of the same track refreshes the tooltip).
       const nextKey = nearest ? `${nearest.mmsi}|${nearest.ts}` : null;
@@ -1178,10 +1282,25 @@ export function GlobeCanvas({
         onImageryHoverRef.current?.(activeImagery);
       }
 
-      // AOI hover (below pings/events/imagery). Hit-test the polygon under the cursor.
+      // Detection hover (below pings/events/imagery).
+      const activeDetection = nearest || activeEvent || activeImagery ? null : detectionHover;
+      const nextDetectionId = activeDetection ? detectionHoverId : null;
+      if (nextDetectionId !== detectionHoveredId) {
+        detectionHoveredId = nextDetectionId;
+        onDetectionHoverRef.current?.(activeDetection);
+      }
+
+      // AOI hover (below pings/events/imagery/detections). Hit-test the polygon under the cursor.
       let aoiHover: AoiHover | null = null;
       let aoiHoverId: string | null = null;
-      if (checkHover && !nearest && !activeEvent && !activeImagery && projection.invert) {
+      if (
+        checkHover &&
+        !nearest &&
+        !activeEvent &&
+        !activeImagery &&
+        !activeDetection &&
+        projection.invert
+      ) {
         const geo = projection.invert([mouse.x, mouse.y]);
         const hitId = geo ? aoiStore.hitTest([geo[0], geo[1]]) : null;
         if (hitId) {
@@ -1209,6 +1328,7 @@ export function GlobeCanvas({
         !nearest &&
         !activeEvent &&
         !activeImagery &&
+        !activeDetection &&
         !aoiHover &&
         eezPoints &&
         projection.invert

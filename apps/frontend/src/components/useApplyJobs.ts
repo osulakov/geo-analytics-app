@@ -10,7 +10,7 @@ import type { Job } from '../stores/JobStore';
  * the results and the New-job widgets.
  */
 export function useApplyJobs() {
-  const { job, analysis, event, ping, layers, aoi } = useStores();
+  const { job, analysis, event, ping, layers, aoi, detection } = useStores();
 
   return useCallback(
     async (jobs: Job[]) => {
@@ -18,6 +18,7 @@ export function useApplyJobs() {
         event.clearJob();
         ping.clearAoiDeviceTracks();
         ping.clearJobTracks();
+        detection.clear();
         analysis.reset();
         aoi.setFromWkt(null);
         layers.clearLayers();
@@ -34,9 +35,17 @@ export function useApplyJobs() {
         ping.applyRange(minFrom.slice(0, 10), maxTo.slice(0, 10));
       }
 
-      // Run each job's analysis and combine the produced events.
+      // Split jobs by whether their analysis re-runs on invoke. SQL analyses
+      // (geofence) recompute their events; analyses that persist results
+      // (object detection) just load their stored detections — no re-run.
+      const runOnInvoke = (j: Job) =>
+        ANALYSES.find((a) => a.id === j.analysisConfigId)?.should_run_on_invoke ?? true;
+      const sqlJobs = jobs.filter(runOnInvoke);
+      const detectionJobs = jobs.filter((j) => !runOnInvoke(j));
+
+      // Run each SQL job's analysis and combine the produced events.
       const events = await analysis.runJobs(
-        jobs.map((j) => ({
+        sqlJobs.map((j) => ({
           analysisConfigId: j.analysisConfigId,
           wkt: j.aoiWkt,
           fromIso: j.fromIso,
@@ -46,6 +55,13 @@ export function useApplyJobs() {
       );
       event.setJobEvents(events);
       ping.clearJobTracks();
+
+      // Load persisted object detections (read-only) for any detection jobs.
+      if (detectionJobs.length > 0) {
+        await detection.loadMany(detectionJobs.map((j) => j.id));
+      } else {
+        detection.clear();
+      }
 
       // Merge AOI device tracks across the jobs whose analyses declare them.
       const aoiJobs = jobs
@@ -62,6 +78,6 @@ export function useApplyJobs() {
 
       layers.showAll();
     },
-    [job, analysis, event, ping, layers, aoi],
+    [job, analysis, event, ping, layers, aoi, detection],
   );
 }

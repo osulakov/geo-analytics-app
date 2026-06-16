@@ -1,6 +1,6 @@
 import { makeAutoObservable, observable, runInAction } from 'mobx';
 
-import { imageUrl, listImages, type UploadedImage } from '../data_loaders/media';
+import { deleteImage, imageUrl, listImages, type UploadedImage } from '../data_loaders/media';
 
 export interface ImageryItem {
   meta: UploadedImage;
@@ -71,6 +71,19 @@ export class ImageryStore {
       }
     } catch (error) {
       console.error('Failed to load imagery:', error);
+    }
+  }
+
+  /** Delete an image from the media bucket and drop it from the list (which the
+   *  map reads, so its footprint/icon disappear immediately). */
+  async remove(id: string): Promise<void> {
+    try {
+      await deleteImage(id);
+      runInAction(() => {
+        this.items = this.items.filter((item) => item.meta.id !== id);
+      });
+    } catch (error) {
+      console.error('Failed to delete image:', error);
     }
   }
 }

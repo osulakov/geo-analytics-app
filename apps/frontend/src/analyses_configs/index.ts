@@ -1,4 +1,5 @@
 import { geofenceEnterExit } from './geofenceEnterExit';
+import { objectDetection } from './objectDetection';
 import type { AnalysisConfig } from './types';
 
 export type {
@@ -10,4 +11,4 @@ export type {
 } from './types';
 
 /** All available analyses, shown in the Analyses widget. */
-export const ANALYSES: AnalysisConfig[] = [geofenceEnterExit];
+export const ANALYSES: AnalysisConfig[] = [geofenceEnterExit, objectDetection];

@@ -67,6 +67,13 @@ export interface AnalysisConfig {
   description: string;
   /** The event type this analysis concerns (matches the `events` table). */
   eventType: string;
+  /**
+   * Whether opening/invoking a saved job re-runs the analysis. True for cheap
+   * read-only DB analyses (geofence); false for expensive ones (object
+   * detection hits the OpenAI API), which instead load persisted results until
+   * the user explicitly presses Re-run.
+   */
+  should_run_on_invoke: boolean;
   /** Map layers this analysis contributes (drives the Layers widget). */
   layers_config: LayerConfig[];
   /** Widgets shown while this analysis is in the Added set (in addition to each

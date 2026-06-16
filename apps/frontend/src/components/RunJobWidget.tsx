@@ -13,11 +13,12 @@ import { SaveJobModal } from './SaveJobModal';
  * jobs. Save persists the current job; Discard wipes everything.
  */
 export const RunJobWidget = observer(function RunJobWidget() {
-  const { analysis, aoi, ping, layers, event, job } = useStores();
+  const { analysis, aoi, ping, layers, event, job, detection } = useStores();
   const applyJobs = useApplyJobs();
   const [saveOpen, setSaveOpen] = useState(false);
 
-  const disabled = analysis.running || analysis.addedConfigs.length === 0;
+  const busy = analysis.running || detection.running;
+  const disabled = busy || analysis.addedConfigs.length === 0;
   const hasResults = analysis.lastResults.length > 0;
   const canDiscard =
     hasResults || job.applied.length > 0 || analysis.added.length > 0 || aoi.aois.length > 0;
@@ -32,20 +33,40 @@ export const RunJobWidget = observer(function RunJobWidget() {
     event.clearJob();
     ping.clearAoiDeviceTracks();
     ping.clearJobTracks();
+    detection.clear();
     layers.clearLayers();
   };
 
   const handleRun = async () => {
-    const configId = analysis.addedConfigs[0]?.id;
-    if (!configId) return;
+    const config = analysis.addedConfigs[0];
+    if (!config) return;
     const base = {
-      analysisConfigId: configId,
-      analysisConfig: analysis.getSettings(configId),
+      analysisConfigId: config.id,
+      analysisConfig: analysis.getSettings(config.id),
       aoiWkt: aoisToWkt(aoi.aois),
       fromIso: ping.rangeStartIso ?? null,
       toIso: ping.rangeEndIso ?? null,
       eventCount: 0,
     };
+
+    // Analyses that persist results (object detection) run on the backend and
+    // need a DB job id first. They create/reuse a real job, then run there.
+    if (!config.should_run_on_invoke) {
+      const editingDbId = job.editingId && /^\d+$/.test(job.editingId) ? job.editingId : null;
+      if (editingDbId) {
+        job.updateApplied(editingDbId, base);
+        await detection.run(editingDbId);
+      } else {
+        const created = await job.createRemote({ name: config.name, ...base });
+        if (!created) return;
+        job.apply(created);
+        job.setEditing(created.id);
+        await detection.run(created.id);
+      }
+      layers.showAll();
+      return;
+    }
+
     if (job.editingId) {
       // Re-run the edited job in place (keeps the other applied jobs).
       job.updateApplied(job.editingId, base);
@@ -61,7 +82,7 @@ export const RunJobWidget = observer(function RunJobWidget() {
   return (
     <div className="run-job">
       <button type="button" className="run-job__button" disabled={disabled} onClick={handleRun}>
-        {analysis.running ? 'Running…' : job.editingId ? 'Re-run' : 'Run Job'}
+        {busy ? 'Running…' : job.editingId ? 'Re-run' : 'Run Job'}
       </button>
 
       {hasResults && (

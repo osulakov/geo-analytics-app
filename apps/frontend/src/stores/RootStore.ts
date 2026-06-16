@@ -2,6 +2,7 @@ import { AnalysisStore } from './AnalysisStore';
 import { AoiStore } from './AoiStore';
 import { AuthStore } from './AuthStore';
 import { ChatStore } from './ChatStore';
+import { DetectionStore } from './DetectionStore';
 import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
@@ -29,6 +30,7 @@ export class RootStore {
   job: JobStore;
   mock: MockStore;
   imagery: ImageryStore;
+  detection: DetectionStore;
 
   constructor() {
     this.auth = new AuthStore();
@@ -45,5 +47,6 @@ export class RootStore {
     this.layers = new LayerStore();
     this.event = new EventStore();
     this.imagery = new ImageryStore();
+    this.detection = new DetectionStore(this.auth);
   }
 }

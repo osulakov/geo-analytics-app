@@ -20,6 +20,8 @@ export const geofenceEnterExit: AnalysisConfig = {
   description:
     "Detects vessels crossing EEZ boundaries on the fly within the selected AOI, or globally when no AOI is set.",
   eventType: "geofence_enter_exit",
+  // Cheap read-only DB query — safe to re-run whenever a saved job is opened.
+  should_run_on_invoke: true,
   // Crossings are drawn as red square icons; the device tracks that produced
   // them are shown as yellow triangles, fetched for the selected AOIs only.
   layers_config: [

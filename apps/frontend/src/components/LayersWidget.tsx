@@ -73,8 +73,20 @@ function PathIcon() {
  * vessels involved in the job's events.
  */
 export const LayersWidget = observer(function LayersWidget() {
-  const { layers, event, ping } = useStores();
-  const layerConfigs = ANALYSES.flatMap((analysis) => analysis.layers_config);
+  const { layers, event, ping, job } = useStores();
+
+  // Toggle list = the distinct layers contributed by the analyses of the
+  // currently applied jobs (deduped by id), not every analysis in the app.
+  const seen = new Set<string>();
+  const layerConfigs = job.applied.flatMap((j) => {
+    const config = ANALYSES.find((a) => a.id === j.analysisConfigId);
+    if (!config) return [];
+    return config.layers_config.filter((layer) => {
+      if (seen.has(layer.id)) return false;
+      seen.add(layer.id);
+      return true;
+    });
+  });
 
   // Unique vessels (MMSIs) involved in the current job's events.
   const jobMmsis = () => [

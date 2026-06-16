@@ -21,6 +21,7 @@ import {
   type PingHover,
   type SatelliteHover,
   type ImageryHover,
+  type DetectionHover,
 } from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { JobResultsColumn } from '../components/JobResultsColumn';
@@ -31,6 +32,7 @@ import { RunJobWidget } from '../components/RunJobWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
 import { SatelliteTooltip } from '../layers_controller/SatelliteTooltip';
 import { ImageryTooltip } from '../layers_controller/ImageryTooltip';
+import { DetectionTooltip } from '../layers_controller/DetectionTooltip';
 import { DataWidget } from '../components/DataWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
@@ -48,6 +50,7 @@ export function ExplorePage() {
   const [eventHover, setEventHover] = useState<EventHover | null>(null);
   const [satHover, setSatHover] = useState<SatelliteHover | null>(null);
   const [imageryHover, setImageryHover] = useState<ImageryHover | null>(null);
+  const [detectionHover, setDetectionHover] = useState<DetectionHover | null>(null);
   const [coordPick, setCoordPick] = useState<CoordinatePick | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Top-left toolbar: radio-style — exactly one widget group is shown.
@@ -115,6 +118,7 @@ export function ExplorePage() {
         onEventHover={setEventHover}
         onSatelliteHover={setSatHover}
         onImageryHover={setImageryHover}
+        onDetectionHover={setDetectionHover}
         onSelect={handleSelect}
         onPickCoordinate={setCoordPick}
         onViewportChange={handleViewport}
@@ -199,6 +203,14 @@ export function ExplorePage() {
           timestamp={imageryHover.timestamp}
           x={imageryHover.x}
           y={imageryHover.y}
+        />
+      )}
+      {detectionHover && !satHover && !hover && !eventHover && !imageryHover && !selected && (
+        <DetectionTooltip
+          metadata={detectionHover.metadata}
+          timestamp={detectionHover.timestamp}
+          x={detectionHover.x}
+          y={detectionHover.y}
         />
       )}
       {aoiHover && !satHover && !hover && !eventHover && !imageryHover && !selected && (

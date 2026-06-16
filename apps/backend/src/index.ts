@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 import { ensureSchema, pool } from './db';
 import { requireAuth, signToken, type TokenPayload } from './auth';
+import { runObjectDetection, type Detection } from './objectDetection';
 
 // Load .env (OPENAI_API_KEY, etc.) from the backend dir when present.
 try {
@@ -303,6 +304,142 @@ app.post('/jobs', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[jobs] create failed:', error);
     res.status(500).json({ error: 'Failed to save job' });
+  }
+});
+
+// Delete a job (only the signed-in user's). Related rows cascade automatically:
+// detected_objects.job_id and events.job_id are ON DELETE CASCADE.
+app.delete('/jobs/:id', requireAuth, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) {
+    res.status(400).json({ error: 'Invalid job id' });
+    return;
+  }
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM jobs WHERE id = $1::bigint AND user_id = $2`,
+      [req.params.id, currentUserId(req)],
+    );
+    res.status(rowCount ? 204 : 404).end();
+  } catch (error) {
+    console.error('[jobs] delete failed:', error);
+    res.status(500).json({ error: 'Failed to delete job' });
+  }
+});
+
+// --- Object detection (imagery → OpenAI → detected_objects) ----------------
+
+interface DetectedObjectRow {
+  id: string;
+  job_id: string;
+  image_id: string | null;
+  geojson: unknown;
+  metadata: unknown;
+  ts: string | null;
+}
+
+function mapDetection(row: DetectedObjectRow) {
+  return {
+    id: String(row.id),
+    jobId: String(row.job_id),
+    imageId: row.image_id,
+    geojson: row.geojson,
+    metadata: row.metadata ?? null,
+    ts: row.ts,
+  };
+}
+
+// Load a job owned by the signed-in user, or null.
+async function loadOwnedJob(jobId: string, userId: number): Promise<JobRow | null> {
+  const { rows } = await pool.query<JobRow>(
+    `SELECT ${JOB_COLUMNS} FROM jobs WHERE id = $1::bigint AND user_id = $2`,
+    [jobId, userId],
+  );
+  return rows[0] ?? null;
+}
+
+// Read the persisted detections for a job (used when invoking a finished job).
+app.get('/jobs/:id/object-detection', requireAuth, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) {
+    res.status(400).json({ error: 'Invalid job id' });
+    return;
+  }
+  try {
+    const job = await loadOwnedJob(req.params.id, currentUserId(req));
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+    const { rows } = await pool.query<DetectedObjectRow>(
+      `SELECT id, job_id, image_id, geojson, metadata, ts
+         FROM detected_objects WHERE job_id = $1::bigint ORDER BY ts NULLS LAST, id`,
+      [req.params.id],
+    );
+    res.json(rows.map(mapDetection));
+  } catch (error) {
+    console.error('[object-detection] load failed:', error);
+    res.status(500).json({ error: 'Failed to load detections' });
+  }
+});
+
+// Run object detection for a job: detect objects in the in-scope imagery and
+// (re)persist them under the job, replacing any previous detections.
+app.post('/jobs/:id/object-detection', requireAuth, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) {
+    res.status(400).json({ error: 'Invalid job id' });
+    return;
+  }
+  try {
+    const job = await loadOwnedJob(req.params.id, currentUserId(req));
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+    let detections: Detection[];
+    try {
+      detections = await runObjectDetection(pool, {
+        aoiWkt: job.aoi_wkt,
+        fromIso: job.from_ts,
+        toIso: job.to_ts,
+      });
+    } catch (error) {
+      console.error('[object-detection] run failed:', error);
+      res.status(502).json({ error: (error as Error).message || 'Object detection failed' });
+      return;
+    }
+
+    // Replace this job's detections atomically, then update its event count.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`DELETE FROM detected_objects WHERE job_id = $1::bigint`, [req.params.id]);
+      for (const d of detections) {
+        await client.query(
+          `INSERT INTO detected_objects (job_id, image_id, geojson, metadata, ts)
+           VALUES ($1::bigint, $2, $3, $4, $5)`,
+          [req.params.id, d.imageId, JSON.stringify(d.geojson), JSON.stringify(d.metadata), d.ts],
+        );
+      }
+      await client.query(`UPDATE jobs SET event_count = $1 WHERE id = $2::bigint`, [
+        detections.length,
+        req.params.id,
+      ]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const { rows } = await pool.query<DetectedObjectRow>(
+      `SELECT id, job_id, image_id, geojson, metadata, ts
+         FROM detected_objects WHERE job_id = $1::bigint ORDER BY ts NULLS LAST, id`,
+      [req.params.id],
+    );
+    res.json(rows.map(mapDetection));
+  } catch (error) {
+    console.error('[object-detection] persist failed:', error);
+    res.status(500).json({ error: 'Failed to run object detection' });
   }
 });
 

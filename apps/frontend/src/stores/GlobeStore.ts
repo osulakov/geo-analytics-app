@@ -1,7 +1,7 @@
 import { makeAutoObservable } from 'mobx';
 
 export const MIN_ZOOM = 0.6;
-export const MAX_ZOOM = 80;
+export const MAX_ZOOM = 1000;
 
 const MAX_PHI = 89;
 const DEFAULT_PHI = -12;

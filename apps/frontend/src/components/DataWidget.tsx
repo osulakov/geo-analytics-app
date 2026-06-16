@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import AnimationIcon from '@mui/icons-material/Animation';
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
@@ -7,7 +7,9 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 import { useStores } from '../stores/StoreContext';
 import triangleIcon from '../assets/analytics_triangle.svg?raw';
+import diamondIcon from '../assets/analytics_diamond.svg?raw';
 import { createMockDeviceTrack, type MockPing, type MockVessel } from '../data_loaders/mock';
+import { uploadImage, imageUrl } from '../data_loaders/media';
 import type { Satellite } from '../data_loaders/satellites';
 
 const FLAGS = ['Panama', 'Liberia', 'Marshall Islands', 'Singapore', 'Malta', 'Greece'];
@@ -15,6 +17,12 @@ const TYPES = ['Cargo', 'Tanker', 'Fishing', 'Passenger', 'Container', 'Bulk Car
 const NAMES = ['Star', 'Wave', 'Horizon', 'Vanguard', 'Meridian', 'Aurora', 'Falcon', 'Orca'];
 const rand = (n: number) => Math.floor(Math.random() * n);
 const pick = <T,>(a: T[]): T => a[rand(a.length)];
+
+/** Format a stored image's ISO timestamp as a readable local date-time. */
+function formatImgTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+}
 
 /** Random vessel for a mocked device track. */
 function buildMockVessel(): MockVessel {
@@ -77,6 +85,8 @@ function buildMockPings(points: [number, number][], fromIso: string, toIso: stri
 
 // Device tracks legend color (matches the yellow triangle markers on the map).
 const DEVICE_TRACKS_COLOR = '#facc15';
+// Imagery layer legend color (matches the red diamond footprint icon on the map).
+const IMAGERY_COLOR = '#ef4444';
 
 const PAGE_SIZE = 5;
 
@@ -192,13 +202,63 @@ const SatelliteRow = observer(function SatelliteRow({ sat }: { sat: Satellite })
  * sections can be added below it. Mirrors the layout of the Vessels widget.
  */
 export const DataWidget = observer(function DataWidget() {
-  const { satellite, layers, mock, vessel, ping, group } = useStores();
+  const { satellite, layers, mock, vessel, ping, group, imagery } = useStores();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   // Mock Data Writer: collapsed by default; what to mock (more options coming).
   const [mockOpen, setMockOpen] = useState(false);
   const [mockTarget, setMockTarget] = useState('device-tracks');
+  const [imageryOpen, setImageryOpen] = useState(false);
+  // Satellites sub-section: collapsed by default.
+  const [satOpen, setSatOpen] = useState(false);
+  // Imagery sub-sections: collapsed by default.
+  const [ingestOpen, setIngestOpen] = useState(false);
+  // Imagery ingestion form.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imgFile, setImgFile] = useState<File | null>(null);
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
+  const [satName, setSatName] = useState('');
+  const [imgWkt, setImgWkt] = useState('');
+  const [imgTimestamp, setImgTimestamp] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+
+  // Stored imagery lives in the shared store (also read by the map). Load it
+  // when the Imagery section opens and refresh it after each upload.
+  useEffect(() => {
+    if (imageryOpen) void imagery.load();
+  }, [imageryOpen, imagery]);
+
+  // Swap in a fresh object-URL preview for the chosen file, revoking the old one.
+  const pickFile = (file: File | null) => {
+    setImgFile(file);
+    setImgPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const handleUpload = async () => {
+    if (!imgFile) return;
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const meta = await uploadImage(imgFile, satName, imgWkt, imgTimestamp);
+      setUploadMsg(`Saved ${meta.filename}`);
+      pickFile(null);
+      setSatName('');
+      setImgWkt('');
+      setImgTimestamp('');
+      if (fileRef.current) fileRef.current.value = '';
+      void imagery.load();
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      setUploadMsg('Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Mock a vessel + hourly device-track pings along the drawn line, then refetch.
   const handleCreateTrack = async () => {
@@ -238,6 +298,7 @@ export const DataWidget = observer(function DataWidget() {
     setQuery(value);
     setPage(0);
     if (value && !expanded) setExpanded(true);
+    if (value) setSatOpen(true);
   };
 
   return (
@@ -303,38 +364,64 @@ export const DataWidget = observer(function DataWidget() {
                 <VisibilityOffIcon fontSize="inherit" />
               )}
             </button>
-          </div>
-
-          <div className="data-widget__list">
-            {pageItems.length === 0 ? (
-              <div className="data-widget__empty">No satellites found</div>
-            ) : (
-              pageItems.map((sat) => <SatelliteRow key={sat.name} sat={sat} />)
-            )}
-          </div>
-
-          <div className="data-widget__pager">
             <button
               type="button"
-              aria-label="Previous page"
-              disabled={currentPage === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="satellite-row__icon"
+              aria-label={satOpen ? 'Collapse satellites' : 'Expand satellites'}
+              aria-expanded={satOpen}
+              onClick={() => setSatOpen((o) => !o)}
             >
-              ‹
-            </button>
-            <span>
-              {currentPage + 1} / {pageCount}
-              <span className="data-widget__count"> · {filtered.length}</span>
-            </span>
-            <button
-              type="button"
-              aria-label="Next page"
-              disabled={currentPage >= pageCount - 1}
-              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-            >
-              ›
+              <svg
+                className={`mock-writer__chevron${satOpen ? ' is-open' : ''}`}
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
             </button>
           </div>
+
+          {satOpen && (
+            <>
+              <div className="data-widget__list">
+                {pageItems.length === 0 ? (
+                  <div className="data-widget__empty">No satellites found</div>
+                ) : (
+                  pageItems.map((sat) => <SatelliteRow key={sat.name} sat={sat} />)
+                )}
+              </div>
+
+              <div className="data-widget__pager">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  disabled={currentPage === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  ‹
+                </button>
+                <span>
+                  {currentPage + 1} / {pageCount}
+                  <span className="data-widget__count"> · {filtered.length}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  disabled={currentPage >= pageCount - 1}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                >
+                  ›
+                </button>
+              </div>
+            </>
+          )}
 
           <div className="data-widget__group-label">AIS data</div>
 
@@ -440,6 +527,189 @@ export const DataWidget = observer(function DataWidget() {
                     </select>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          <div className="mock-writer-section">
+            <button
+              type="button"
+              className="mock-writer__header"
+              aria-expanded={imageryOpen}
+              onClick={() => setImageryOpen((o) => !o)}
+            >
+              <span>Imagery</span>
+              <svg
+                className={`mock-writer__chevron${imageryOpen ? ' is-open' : ''}`}
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {imageryOpen && (
+              <div className="mock-writer">
+                <div className="layer">
+                  <div className="layer__header">
+                    <button
+                      type="button"
+                      className="layer__expand"
+                      aria-expanded={layers.imageryExpanded}
+                      onClick={() => layers.toggleImageryExpanded()}
+                    >
+                      <svg
+                        className={`layer__chevron${layers.imageryExpanded ? ' is-open' : ''}`}
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="9 6 15 12 9 18" />
+                      </svg>
+                      <span
+                        className="layer__icon"
+                        style={{ color: IMAGERY_COLOR }}
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{ __html: diamondIcon }}
+                      />
+                      <span className="layer__name">Imagery layer</span>
+                    </button>
+                    <Toggle
+                      on={layers.imageryVisible}
+                      onChange={() => layers.toggleImagery()}
+                      label="Toggle Imagery layer"
+                    />
+                  </div>
+                  {layers.imageryExpanded && (
+                    <div className="layer__sublayers">
+                      <div className="sublayer">
+                        <span className="sublayer__name">Icon</span>
+                        <Toggle
+                          on={layers.imageryIconVisible}
+                          onChange={() => layers.toggleImageryIcon()}
+                          label="Toggle imagery icon sublayer"
+                        />
+                      </div>
+                      <div className="sublayer">
+                        <span className="sublayer__name">Image</span>
+                        <Toggle
+                          on={layers.imageryImageVisible}
+                          onChange={() => layers.toggleImageryImage()}
+                          label="Toggle imagery image sublayer"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="imagery-subsection">
+                  <button
+                    type="button"
+                    className="imagery-subsection__header"
+                    aria-expanded={ingestOpen}
+                    onClick={() => setIngestOpen((o) => !o)}
+                  >
+                    <span>Ingest Imagery</span>
+                    <svg
+                      className={`mock-writer__chevron${ingestOpen ? ' is-open' : ''}`}
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {ingestOpen && (
+                    <div className="mock-writer">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="imagery__file"
+                        aria-label="Image file"
+                        onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
+                      />
+                      {imgPreview && (
+                        <img className="imagery__preview" src={imgPreview} alt="Selected image preview" />
+                      )}
+                      <input
+                        type="text"
+                        className="mock-writer__select"
+                        placeholder="Satellite name"
+                        value={satName}
+                        onChange={(event) => setSatName(event.target.value)}
+                        aria-label="Satellite name"
+                      />
+                      <input
+                        type="text"
+                        className="mock-writer__select"
+                        placeholder="WKT (POLYGON((…)))"
+                        value={imgWkt}
+                        onChange={(event) => setImgWkt(event.target.value)}
+                        aria-label="Image WKT"
+                      />
+                      <input
+                        type="datetime-local"
+                        className="mock-writer__select"
+                        value={imgTimestamp}
+                        onChange={(event) => setImgTimestamp(event.target.value)}
+                        aria-label="Capture timestamp"
+                      />
+                      <button
+                        type="button"
+                        className="mock-writer__create"
+                        disabled={!imgFile || uploading}
+                        onClick={handleUpload}
+                      >
+                        {uploading ? 'Uploading…' : 'Upload to media bucket'}
+                      </button>
+                      {uploadMsg && <div className="mock-writer__hint">{uploadMsg}</div>}
+                    </div>
+                  )}
+                </div>
+
+                <div className="imagery-list">
+                  {imagery.items.length === 0 ? (
+                    <div className="mock-writer__hint">No imagery yet.</div>
+                  ) : (
+                    imagery.items.map(({ meta }) => (
+                      <div key={meta.id} className="imagery-item">
+                        <img
+                          className="imagery-item__thumb"
+                          src={imageUrl(meta.id)}
+                          alt={meta.filename}
+                          loading="lazy"
+                        />
+                        <div className="imagery-item__meta">
+                          <span className="imagery-item__name">
+                            {meta.satelliteName ?? meta.filename}
+                          </span>
+                          <span className="imagery-item__time">
+                            {formatImgTime(meta.timestamp ?? meta.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>

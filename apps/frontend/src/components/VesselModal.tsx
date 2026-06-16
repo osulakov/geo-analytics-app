@@ -14,14 +14,22 @@ function formatMetres(value: number | null): string {
   return value === null ? "—" : `${value} m`;
 }
 
+/** Render an ISO ping timestamp as a readable local date-time. */
+function formatTimestamp(iso: string | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+}
+
 /** Modal with a vessel's static info, "Show full path", and group actions. */
 export const VesselModal = observer(function VesselModal({
   mmsi,
   onClose,
   onShowPath,
 }: VesselModalProps) {
-  const { group } = useStores();
+  const { group, ping } = useStores();
   const [vessel, setVessel] = useState<StaticVesselInfo | null>(null);
+  const pingTs = ping.pings.find((p) => p.mmsi === mmsi)?.ts;
   const [groupOpen, setGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -74,6 +82,10 @@ export const VesselModal = observer(function VesselModal({
 
         {vessel && (
           <dl className="vessel-modal__list">
+            <div>
+              <dt>Timestamp</dt>
+              <dd>{formatTimestamp(pingTs)}</dd>
+            </div>
             <div>
               <dt>MMSI</dt>
               <dd>{vessel.mmsi}</dd>

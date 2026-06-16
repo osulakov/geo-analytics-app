@@ -18,7 +18,7 @@ export const geofenceEnterExit: AnalysisConfig = {
   id: "geofence-enter-exit",
   name: "EEZ Geofence Crossings (Enter / Exit)",
   description:
-    "Vessels crossing EEZ boundaries within the selected AOI, or globally when no AOI is set.",
+    "Detects vessels crossing EEZ boundaries on the fly within the selected AOI, or globally when no AOI is set.",
   eventType: "geofence_enter_exit",
   // Crossings are drawn as red square icons; the device tracks that produced
   // them are shown as yellow triangles, fetched for the selected AOIs only.
@@ -60,18 +60,44 @@ export const geofenceEnterExit: AnalysisConfig = {
 
     const parts: string[] = [];
 
-    // EEZ crossings: read the precomputed geofence_enter_exit events.
+    // EEZ crossings: computed on the fly (read-only). Walks each vessel's
+    // adjacent ais_ping pairs and intersects the segment with the EEZ boundary
+    // lines (eez_segments, seeded by analyses_scripts/seed_eez_segments.sh).
+    // enter/exit comes from the crossing direction (cross-product sign).
     if (s.detectEezCrossing) {
       parts.push(`
-        SELECT mmsi, subtype, ts, details,
-               ST_X(position::geometry) AS lon,
-               ST_Y(position::geometry) AS lat
-          FROM events
-         WHERE event_type = 'geofence_enter_exit'
-           AND (${pWkt}::text IS NULL OR ST_Within(position::geometry, ST_GeomFromText(${pWkt}, 4326)))
-           AND (${pFrom}::timestamptz IS NULL OR ts >= ${pFrom}::timestamptz)
-           AND (${pTo}::timestamptz IS NULL OR ts <= ${pTo}::timestamptz)
-           AND (${pMmsis}::text[] IS NULL OR mmsi = ANY(${pMmsis}::text[]))`);
+        SELECT mmsi,
+               CASE
+                 WHEN (ST_X(ST_EndPoint(bseg)) - ST_X(ST_StartPoint(bseg))) * (ST_Y(p2) - ST_Y(p))
+                    - (ST_Y(ST_EndPoint(bseg)) - ST_Y(ST_StartPoint(bseg))) * (ST_X(p2) - ST_X(p)) >= 0
+                 THEN 'enter' ELSE 'exit'
+               END AS subtype,
+               ts + (ts2 - ts) / 2 AS ts,
+               jsonb_build_object('eez', eez_name) AS details,
+               ST_X(xpoint) AS lon,
+               ST_Y(xpoint) AS lat
+          FROM (
+            SELECT pr.mmsi, pr.ts, pr.ts2, pr.p, pr.p2,
+                   s.geom AS bseg, s.name AS eez_name,
+                   ST_Centroid(ST_Intersection(pr.seg, s.geom)) AS xpoint
+              FROM (
+                SELECT mmsi, ts, ts2, p, p2, ST_MakeLine(p, p2) AS seg
+                  FROM (
+                    SELECT mmsi, ts, position::geometry AS p,
+                           lead(ts) OVER w AS ts2,
+                           lead(position::geometry) OVER w AS p2
+                      FROM ais_pings
+                     WHERE (${pFrom}::timestamptz IS NULL OR ts >= ${pFrom}::timestamptz)
+                       AND (${pTo}::timestamptz IS NULL OR ts <= ${pTo}::timestamptz)
+                       AND (${pMmsis}::text[] IS NULL OR mmsi = ANY(${pMmsis}::text[]))
+                       AND (${pWkt}::text IS NULL OR ST_Within(position::geometry, ST_GeomFromText(${pWkt}, 4326)))
+                    WINDOW w AS (PARTITION BY mmsi ORDER BY ts)
+                  ) ordered
+                 WHERE p2 IS NOT NULL AND NOT ST_Equals(p, p2)
+              ) pr
+              JOIN eez_segments s ON ST_Intersects(pr.seg, s.geom)
+          ) crossings
+         WHERE xpoint IS NOT NULL AND NOT ST_IsEmpty(xpoint)`);
     }
 
     // AOI boundary crossings: adjacent ais_ping segments crossing the AOI edge.

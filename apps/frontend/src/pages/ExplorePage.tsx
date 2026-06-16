@@ -20,6 +20,7 @@ import {
   type EventHover,
   type PingHover,
   type SatelliteHover,
+  type ImageryHover,
 } from '../layers_controller/GlobeCanvas';
 import { GlobeControls } from '../components/GlobeControls';
 import { JobResultsColumn } from '../components/JobResultsColumn';
@@ -29,6 +30,7 @@ import { RecentJobsWidget } from '../components/RecentJobsWidget';
 import { RunJobWidget } from '../components/RunJobWidget';
 import { SatelliteCounter } from '../components/SatelliteCounter';
 import { SatelliteTooltip } from '../layers_controller/SatelliteTooltip';
+import { ImageryTooltip } from '../layers_controller/ImageryTooltip';
 import { DataWidget } from '../components/DataWidget';
 import { ShipCounter } from '../components/ShipCounter';
 import { TimeSlider } from '../components/TimeSlider';
@@ -45,6 +47,7 @@ export function ExplorePage() {
   const [aoiHover, setAoiHover] = useState<AoiHover | null>(null);
   const [eventHover, setEventHover] = useState<EventHover | null>(null);
   const [satHover, setSatHover] = useState<SatelliteHover | null>(null);
+  const [imageryHover, setImageryHover] = useState<ImageryHover | null>(null);
   const [coordPick, setCoordPick] = useState<CoordinatePick | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Top-left toolbar: radio-style — exactly one widget group is shown.
@@ -58,6 +61,7 @@ export function ExplorePage() {
     stores.satellite.load();
     stores.group.loadGroups();
     void stores.ping.loadActiveCount();
+    void stores.imagery.load();
   }, [stores]);
 
   // Reload pings + events for the visible cap whenever the view settles.
@@ -73,17 +77,16 @@ export function ExplorePage() {
   };
 
   const handleSelect = (mmsi: string) => {
-    // Opening the modal clears the hover tooltip and any previous path, and
-    // marks the vessel as selected (glowing pulse) — without flying to it.
+    // Opening the modal clears the hover tooltip and marks the vessel as
+    // selected (glowing pulse) — without flying to it. Any tracks already on the
+    // map (device tracks, group paths) are left intact.
     setHover(null);
-    stores.ping.clearTracks();
     stores.ping.setHighlight(mmsi);
     setSelected(mmsi);
   };
 
   const handleClose = () => {
     setSelected(null);
-    stores.ping.clearTracks();
   };
 
   const handleShowPath = (mmsi: string) => {
@@ -111,6 +114,7 @@ export function ExplorePage() {
         onAoiHover={setAoiHover}
         onEventHover={setEventHover}
         onSatelliteHover={setSatHover}
+        onImageryHover={setImageryHover}
         onSelect={handleSelect}
         onPickCoordinate={setCoordPick}
         onViewportChange={handleViewport}
@@ -189,7 +193,15 @@ export function ExplorePage() {
       {eventHover && !satHover && !hover && !selected && (
         <EventTooltip event={eventHover.event} x={eventHover.x} y={eventHover.y} />
       )}
-      {aoiHover && !satHover && !hover && !eventHover && !selected && (
+      {imageryHover && !satHover && !hover && !eventHover && !selected && (
+        <ImageryTooltip
+          name={imageryHover.name}
+          timestamp={imageryHover.timestamp}
+          x={imageryHover.x}
+          y={imageryHover.y}
+        />
+      )}
+      {aoiHover && !satHover && !hover && !eventHover && !imageryHover && !selected && (
         <AoiTooltip
           name={aoiHover.name}
           areaKm2={aoiHover.areaKm2}
@@ -197,7 +209,13 @@ export function ExplorePage() {
           y={aoiHover.y}
         />
       )}
-      {eezHover && !satHover && !hover && !eventHover && !aoiHover && !selected && (
+      {eezHover &&
+        !satHover &&
+        !hover &&
+        !eventHover &&
+        !imageryHover &&
+        !aoiHover &&
+        !selected && (
         <EezTooltip name={eezHover.name} x={eezHover.x} y={eezHover.y} />
       )}
       {coordPick && (

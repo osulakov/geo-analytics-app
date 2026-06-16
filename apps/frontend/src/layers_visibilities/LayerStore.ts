@@ -21,8 +21,50 @@ export class LayerStore {
   /** Visible configured event layers, keyed by their `layers_config` id. */
   visibleLayers = new Set<string>();
 
+  /** Master switch for the Imagery layer group (off by default). */
+  imageryVisible = false;
+  /** Sublayer: the footprint icon (red diamond) markers. */
+  imageryIconVisible = false;
+  /** Sublayer: the raster image drawn over its footprint. */
+  imageryImageVisible = false;
+  /** Whether the Imagery sublayers are expanded (collapsed by default). */
+  imageryExpanded = false;
+
   constructor() {
     makeAutoObservable(this);
+  }
+
+  /** Effective visibility of the imagery footprint icons. */
+  get imageryIconActive(): boolean {
+    return this.imageryVisible && this.imageryIconVisible;
+  }
+
+  /** Effective visibility of the imagery raster images. */
+  get imageryImageActive(): boolean {
+    return this.imageryVisible && this.imageryImageVisible;
+  }
+
+  /** Toggle the whole Imagery group; cascades to both sublayers. */
+  toggleImagery(): void {
+    const next = !this.imageryVisible;
+    this.imageryVisible = next;
+    this.imageryIconVisible = next;
+    this.imageryImageVisible = next;
+  }
+
+  toggleImageryIcon(): void {
+    this.imageryIconVisible = !this.imageryIconVisible;
+    // Parent reflects its sublayers: on if any is on, off if none are.
+    this.imageryVisible = this.imageryIconVisible || this.imageryImageVisible;
+  }
+
+  toggleImageryImage(): void {
+    this.imageryImageVisible = !this.imageryImageVisible;
+    this.imageryVisible = this.imageryIconVisible || this.imageryImageVisible;
+  }
+
+  toggleImageryExpanded(): void {
+    this.imageryExpanded = !this.imageryExpanded;
   }
 
   /** Effective visibility of the ping markers. */

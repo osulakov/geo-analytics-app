@@ -204,6 +204,20 @@ export const AnalysisSettingsModal = observer(function AnalysisSettingsModal({
             <div className="analysis-settings__hint">All vessels (none selected)</div>
           )}
         </div>
+
+        <div className="analysis-settings__actions">
+          <button
+            type="button"
+            className="analysis-settings__add"
+            disabled={analysis.isAdded(config.id)}
+            onClick={() => {
+              analysis.add(config.id);
+              onClose();
+            }}
+          >
+            {analysis.isAdded(config.id) ? 'Added' : 'Use analysis'}
+          </button>
+        </div>
       </div>
     </div>,
     document.body,

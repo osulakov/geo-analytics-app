@@ -10,6 +10,7 @@ import countries110m from 'world-atlas/countries-110m.json';
 // Resolved to a static URL and fetched lazily the first time the layer is on.
 import eezUrl from '../assets/eez-simplified.geojson?url';
 import analyticsSquareRaw from '../assets/analytics_square.svg?raw';
+import analyticsDiamondRaw from '../assets/analytics_diamond.svg?raw';
 import { useStores } from '../stores/StoreContext';
 import { colorForMmsi, colorForMmsiAlpha } from './colorMap';
 import type { MapEvent } from '../data_loaders/events';
@@ -38,6 +39,29 @@ let geofenceIconReady = false;
   img.src =
     'data:image/svg+xml;charset=utf-8,' +
     encodeURIComponent(analyticsSquareRaw.replace(/currentColor/g, GEOFENCE_COLOR));
+}
+
+// Imagery footprint icon (the red diamond SVG), rasterized once like the
+// geofence square above. The diamond's viewBox is 24×32, so the bitmap keeps
+// that aspect ratio.
+const IMAGERY_COLOR = '#ef4444';
+const IMAGERY_ICON_W = 15;
+const IMAGERY_ICON_H = 20;
+const imageryIconCanvas = document.createElement('canvas');
+imageryIconCanvas.width = IMAGERY_ICON_W * 2;
+imageryIconCanvas.height = IMAGERY_ICON_H * 2;
+let imageryIconReady = false;
+{
+  const img = new Image();
+  img.onload = () => {
+    const c = imageryIconCanvas.getContext('2d');
+    if (!c) return;
+    c.drawImage(img, 0, 0, imageryIconCanvas.width, imageryIconCanvas.height);
+    imageryIconReady = true;
+  };
+  img.src =
+    'data:image/svg+xml;charset=utf-8,' +
+    encodeURIComponent(analyticsDiamondRaw.replace(/currentColor/g, IMAGERY_COLOR));
 }
 
 // AIS-off (gap) events: orange upward triangle drawn directly on the canvas.
@@ -241,6 +265,14 @@ export interface EventHover {
   y: number;
 }
 
+/** A stored imagery footprint (its icon or raster) under the cursor. */
+export interface ImageryHover {
+  name: string;
+  timestamp: string | null;
+  x: number;
+  y: number;
+}
+
 /** A coordinate picked by double-clicking the globe. */
 export interface CoordinatePick {
   lon: number;
@@ -270,6 +302,8 @@ interface GlobeCanvasProps {
   onEventHover?: (hover: EventHover | null) => void;
   /** Called when the hovered satellite (ping or coverage strip) changes. */
   onSatelliteHover?: (hover: SatelliteHover | null) => void;
+  /** Called when the hovered imagery footprint (icon or raster) changes. */
+  onImageryHover?: (hover: ImageryHover | null) => void;
   /** Called when a ping is clicked (vessel MMSI). */
   onSelect?: (mmsi: string) => void;
   /** Called when the globe is double-clicked (null if off-globe). */
@@ -366,6 +400,7 @@ export function GlobeCanvas({
   onAoiHover,
   onEventHover,
   onSatelliteHover,
+  onImageryHover,
   onSelect,
   onPickCoordinate,
   onViewportChange,
@@ -385,6 +420,8 @@ export function GlobeCanvas({
   onEventHoverRef.current = onEventHover;
   const onSatelliteHoverRef = useRef(onSatelliteHover);
   onSatelliteHoverRef.current = onSatelliteHover;
+  const onImageryHoverRef = useRef(onImageryHover);
+  onImageryHoverRef.current = onImageryHover;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onPickCoordinateRef = useRef(onPickCoordinate);
@@ -407,6 +444,7 @@ export function GlobeCanvas({
     const satelliteStore = stores.satellite;
     const aoiStore = stores.aoi;
     const mockStore = stores.mock;
+    const imageryStore = stores.imagery;
     const projection = geoOrthographic().precision(0.1);
     const path = geoPath(projection, ctx);
 
@@ -430,6 +468,8 @@ export function GlobeCanvas({
     let satHoveredKey: string | null = null;
     // Id of the hovered AOI (for change detection).
     let aoiHoveredId: string | null = null;
+    // Id of the hovered imagery footprint (for change detection).
+    let imageryHoveredId: string | null = null;
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -610,6 +650,98 @@ export function GlobeCanvas({
           ctx.arc(proj[0], proj[1], 3, 0, 2 * Math.PI);
           ctx.fillStyle = MOCK_STROKE;
           ctx.fill();
+        }
+      }
+
+      // Imagery footprints: the raster image clipped to its WKT polygon (the
+      // "image" sublayer), and the red diamond marker at the footprint centroid
+      // (the "icon" sublayer). Images are drawn first, icons in a second pass,
+      // so every icon sits above every image.
+      let imageryHover: ImageryHover | null = null;
+      let imageryHoverId: string | null = null;
+      if (layerStore.imageryImageActive || layerStore.imageryIconActive) {
+        const items = imageryStore.items;
+        const imgHoverCheck = mouse.inside && !dragging;
+        const setImageryHover = (item: (typeof items)[number]) => {
+          imageryHover = {
+            name: item.meta.satelliteName ?? item.meta.filename,
+            timestamp: item.meta.timestamp ?? item.meta.createdAt,
+            x: mouse.x,
+            y: mouse.y,
+          };
+          imageryHoverId = item.meta.id;
+        };
+        if (layerStore.imageryImageActive) {
+          for (const item of items) {
+            if (!item.polygon || !item.center) continue;
+            if (geoDistance(item.center, aoiCenter) > Math.PI / 2) continue;
+            // Project the ring; skip the footprint if any vertex wraps to the
+            // far side (a planar fill would otherwise smear across the globe).
+            const pts: [number, number][] = [];
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            let ok = true;
+            for (const v of item.polygon) {
+              if (geoDistance(v, aoiCenter) > Math.PI / 2) {
+                ok = false;
+                break;
+              }
+              const p = projection(v);
+              if (!p) {
+                ok = false;
+                break;
+              }
+              pts.push([p[0], p[1]]);
+              if (p[0] < minX) minX = p[0];
+              if (p[0] > maxX) maxX = p[0];
+              if (p[1] < minY) minY = p[1];
+              if (p[1] > maxY) maxY = p[1];
+            }
+            if (!ok || pts.length < 3) continue;
+            const tracePath = () => {
+              ctx.beginPath();
+              ctx.moveTo(pts[0][0], pts[0][1]);
+              for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1]);
+              ctx.closePath();
+            };
+            const img = item.image;
+            if (img && img.complete && img.naturalWidth > 0) {
+              ctx.save();
+              tracePath();
+              ctx.clip();
+              ctx.globalAlpha = 0.85;
+              ctx.drawImage(img, minX, minY, maxX - minX, maxY - minY);
+              ctx.restore();
+            }
+            // Footprint outline (also a placeholder before the raster loads).
+            tracePath();
+            ctx.strokeStyle = IMAGERY_COLOR;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+            if (imgHoverCheck && pointInPolygon(mouse.x, mouse.y, pts)) {
+              setImageryHover(item);
+            }
+          }
+        }
+        if (layerStore.imageryIconActive && imageryIconReady) {
+          const halfW = IMAGERY_ICON_W / 2;
+          const halfH = IMAGERY_ICON_H / 2;
+          for (const item of items) {
+            if (!item.center) continue;
+            if (geoDistance(item.center, aoiCenter) > Math.PI / 2) continue;
+            const p = projection(item.center);
+            if (!p) continue;
+            ctx.drawImage(imageryIconCanvas, p[0] - halfW, p[1] - halfH, IMAGERY_ICON_W, IMAGERY_ICON_H);
+            if (
+              imgHoverCheck &&
+              Math.abs(mouse.x - p[0]) <= halfW &&
+              Math.abs(mouse.y - p[1]) <= halfH
+            ) {
+              setImageryHover(item);
+            }
+          }
         }
       }
 
@@ -1027,10 +1159,19 @@ export function GlobeCanvas({
         onEventHoverRef.current?.(activeEvent);
       }
 
-      // AOI hover (below pings/events). Hit-test the polygon under the cursor.
+      // Imagery hover (below pings/events). The candidate was hit-tested during
+      // the imagery draw pass; pings and events take precedence.
+      const activeImagery = nearest || activeEvent ? null : imageryHover;
+      const nextImageryId = activeImagery ? imageryHoverId : null;
+      if (nextImageryId !== imageryHoveredId) {
+        imageryHoveredId = nextImageryId;
+        onImageryHoverRef.current?.(activeImagery);
+      }
+
+      // AOI hover (below pings/events/imagery). Hit-test the polygon under the cursor.
       let aoiHover: AoiHover | null = null;
       let aoiHoverId: string | null = null;
-      if (checkHover && !nearest && !activeEvent && projection.invert) {
+      if (checkHover && !nearest && !activeEvent && !activeImagery && projection.invert) {
         const geo = projection.invert([mouse.x, mouse.y]);
         const hitId = geo ? aoiStore.hitTest([geo[0], geo[1]]) : null;
         if (hitId) {
@@ -1057,6 +1198,7 @@ export function GlobeCanvas({
         checkHover &&
         !nearest &&
         !activeEvent &&
+        !activeImagery &&
         !aoiHover &&
         eezPoints &&
         projection.invert

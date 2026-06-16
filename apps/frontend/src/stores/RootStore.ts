@@ -5,6 +5,7 @@ import { ChatStore } from './ChatStore';
 import { EventStore } from './EventStore';
 import { GlobeStore } from './GlobeStore';
 import { GroupStore } from './GroupStore';
+import { ImageryStore } from './ImageryStore';
 import { JobStore } from './JobStore';
 import { LayerStore } from '../layers_visibilities/LayerStore';
 import { MockStore } from './MockStore';
@@ -27,6 +28,7 @@ export class RootStore {
   analysis: AnalysisStore;
   job: JobStore;
   mock: MockStore;
+  imagery: ImageryStore;
 
   constructor() {
     this.auth = new AuthStore();
@@ -42,5 +44,6 @@ export class RootStore {
     this.group = new GroupStore();
     this.layers = new LayerStore();
     this.event = new EventStore();
+    this.imagery = new ImageryStore();
   }
 }
